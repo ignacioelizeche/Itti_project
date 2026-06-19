@@ -1,0 +1,21 @@
+{
+  "name": "itti-alliances",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=packages/api",
+    "dev:web": "npm run dev --workspace=packages/web",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "build": "npm run build --workspaces",
+    "db:migrate": "npx prisma migrate dev --schema=packages/api/prisma/schema.prisma",
+    "db:generate": "npx prisma generate --schema=packages/api/prisma/schema.prisma",
+    "db:seed": "npx tsx packages/api/prisma/seed.ts",
+    "db:studio": "npx prisma studio --schema=packages/api/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.0"
+  }
+}

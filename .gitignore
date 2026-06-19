@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+.next/
+.nuxt/
+*.tsbuildinfo
+packages/api/prisma/migrations/
+packages/api/prisma/migration_lock.toml
