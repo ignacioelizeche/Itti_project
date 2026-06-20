@@ -17,7 +17,7 @@ export const config = {
   },
 
   ollama: {
-    url: process.env.OLLAMA_URL || "http://localhost:11434",
+    url: process.env.OLLAMA_URL || "http://192.168.2.33:30068",
     embedModel: process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text",
     chatModel: process.env.OLLAMA_CHAT_MODEL || "llama3.1",
   },

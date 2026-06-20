@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import type { FastifyInstance } from "fastify";
-import fp from "fastify-plugin";
+import fastifyPlugin from "fastify-plugin";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -10,7 +10,7 @@ declare module "fastify" {
 
 async function prismaPlugin(fastify: FastifyInstance) {
   const prisma = new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
   await prisma.$connect();
@@ -22,4 +22,4 @@ async function prismaPlugin(fastify: FastifyInstance) {
   });
 }
 
-export default fp(prismaPlugin, { name: "prisma" });
+export default fastifyPlugin(prismaPlugin, { name: "prisma" });

@@ -29,6 +29,9 @@ model Company {
   instagramFollowers Int?      @map("instagram_followers")
   sizeEstimate       String?   @map("size_estimate")
   foundedYear        Int?      @map("founded_year")
+  allianceStatus     String?   @map("alliance_status")  // active, inactive, prospect
+  allianceDetails    Json?     @map("alliance_details") // benefit type, conditions, etc.
+  tags               Json?                            // flexible tags
   lastScrapedAt      DateTime? @map("last_scraped_at")
   dataSources        Json?     @map("data_sources")
   createdAt          DateTime  @default(now()) @map("created_at")
@@ -78,7 +81,7 @@ model CompanyAnalysis {
 model CompanyEmbedding {
   id          Int      @id @default(autoincrement())
   companyId   Int      @unique @map("company_id")
-  embedding   Unsupported("vector(384)")
+  embedding   Unsupported("vector(768)")
   contentHash String   @map("content_hash")
   createdAt   DateTime @default(now()) @map("created_at")
 

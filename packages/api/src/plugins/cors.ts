@@ -1,6 +1,6 @@
 import cors from "@fastify/cors";
 import type { FastifyInstance } from "fastify";
-import fp from "fastify-plugin";
+import fastifyPlugin from "fastify-plugin";
 
 async function corsPlugin(fastify: FastifyInstance) {
   await fastify.register(cors, {
@@ -9,4 +9,4 @@ async function corsPlugin(fastify: FastifyInstance) {
   });
 }
 
-export default fp(corsPlugin, { name: "cors" });
+export default fastifyPlugin(corsPlugin, { name: "cors" });
