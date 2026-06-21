@@ -57,8 +57,8 @@ export async function scrapeInstagram(username: string): Promise<InstagramData |
           : "",
       }));
 
-    const totalLikes = recentPosts.reduce((sum, p) => sum + p.likes, 0);
-    const totalComments = recentPosts.reduce((sum, p) => sum + p.comments, 0);
+    const totalLikes = recentPosts.reduce((sum: number, p: { likes: number }) => sum + p.likes, 0);
+    const totalComments = recentPosts.reduce((sum: number, p: { comments: number }) => sum + p.comments, 0);
     const avgLikes = recentPosts.length > 0 ? Math.round(totalLikes / recentPosts.length) : 0;
     const avgComments = recentPosts.length > 0 ? Math.round(totalComments / recentPosts.length) : 0;
     const followers = user.edge_followed_by?.count || 0;

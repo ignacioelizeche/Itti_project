@@ -2,33 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { api, type Stats } from "@/lib/api";
-import { api as apiClient } from "@/lib/api";
-import { Play, RefreshCw, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Play, RefreshCw } from "lucide-react";
 
 export default function ScoringPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [fullFlowRunning, setFullFlowRunning] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    api
-      .getStats()
-      .then(setStats)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    api.getStats().then(setStats).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const handleAnalyzeAll = async () => {
     setAnalyzing(true);
     setMessage("");
     try {
-      const res = await apiClient.analyzeBatch(undefined, 100);
+      const res = await api.analyzeBatch(undefined, 100);
       setMessage(res.message);
-    } catch (err) {
+    } catch {
       setMessage("Error al iniciar análisis");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleFullFlow = async () => {
+    setFullFlowRunning(true);
+    setMessage("");
+    try {
+      const res = await api.fullFlowBatch(undefined, 200, true);
+      setMessage(res.message + ". " + res.note);
+    } catch {
+      setMessage("Error al iniciar pipeline completo");
+    } finally {
+      setFullFlowRunning(false);
     }
   };
 
@@ -44,7 +53,6 @@ export default function ScoringPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Scoring IA</h1>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <div className="text-2xl font-bold">{stats?.analyzed || 0}</div>
@@ -60,54 +68,30 @@ export default function ScoringPage() {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
         <h2 className="text-lg font-semibold mb-4">Acciones</h2>
         <div className="flex gap-4">
           <button
+            onClick={handleFullFlow}
+            disabled={fullFlowRunning || analyzing}
+            className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
+          >
+            {fullFlowRunning ? <RefreshCw size={18} className="animate-spin" /> : <Play size={18} />}
+            {fullFlowRunning ? "Procesando..." : "Pipeline Completo (Enriquecer + Analizar)"}
+          </button>
+          <button
             onClick={handleAnalyzeAll}
-            disabled={analyzing}
+            disabled={analyzing || fullFlowRunning}
             className="flex items-center gap-2 bg-ueno-blue text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
           >
-            {analyzing ? (
-              <RefreshCw size={18} className="animate-spin" />
-            ) : (
-              <Play size={18} />
-            )}
-            {analyzing ? "Analizando..." : "Analizar pendientes"}
+            {analyzing ? <RefreshCw size={18} className="animate-spin" /> : <Play size={18} />}
+            {analyzing ? "Analizando..." : "Solo Analizar"}
           </button>
         </div>
         {message && (
-          <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-lg text-sm">
-            {message}
-          </div>
+          <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-lg text-sm">{message}</div>
         )}
       </div>
-
-      {/* Score Distribution */}
-      {stats && stats.byLabel.length > 0 && (
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4">Distribución</h2>
-          <div className="space-y-3">
-            {stats.byLabel.map((item) => (
-              <div key={item.label} className="flex items-center gap-3">
-                <div className="w-40 text-sm text-gray-600">{item.label}</div>
-                <div className="flex-1 bg-gray-200 rounded-full h-4">
-                  <div
-                    className="bg-ueno-blue h-4 rounded-full"
-                    style={{
-                      width: `${(item.count / (stats.analyzed || 1)) * 100}%`,
-                    }}
-                  />
-                </div>
-                <span className="text-sm font-medium w-12 text-right">
-                  {item.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

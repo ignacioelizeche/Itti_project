@@ -1,4 +1,4 @@
-import { chatCompletionJSON } from "./groq-client.js";
+import { chatCompletionJSON } from "./llm-client.js";
 
 interface ScoreBreakdown {
   categoryFit: number;
@@ -94,8 +94,12 @@ export async function calculateAffinityScore(
     city?: string;
     allianceStatus?: string;
     allianceDetails?: Record<string, unknown>;
+    instagramFollowers?: number | null;
+    dataSources?: Record<string, unknown>;
   }
 ): Promise<ScoreResult> {
+  const ds = (rawData.dataSources as Record<string, any>) || {};
+
   const dataContext = [
     `Empresa: ${companyName}`,
     `Rubro: ${attributes.industry}`,
@@ -113,6 +117,15 @@ export async function calculateAffinityScore(
     rawData.city && `Ubicación: ${rawData.city}, Paraguay`,
     rawData.allianceStatus === "active" && "⚠️ Ya es aliado activo de Ueno+",
     rawData.allianceDetails?.benefit && `Beneficio actual: ${rawData.allianceDetails.benefit}`,
+    rawData.instagramFollowers && `Instagram seguidores: ${rawData.instagramFollowers}`,
+    ds.instagram?.engagementRate && `Instagram engagement rate: ${ds.instagram.engagementRate}%`,
+    ds.instagram?.avgLikes && `Instagram likes promedio: ${ds.instagram.avgLikes}`,
+    ds.instagram?.avgComments && `Instagram comentarios promedio: ${ds.instagram.avgComments}`,
+    ds.instagram?.biography && `Instagram bio: ${ds.instagram.biography}`,
+    ds.facebook?.followers && `Facebook seguidores: ${ds.facebook.followers}`,
+    ds.facebook?.rating && `Facebook rating: ${ds.facebook.rating}/5`,
+    ds.similarweb?.monthlyVisits && `Tráfico web mensual estimado: ${ds.similarweb.monthlyVisits}`,
+    ds.similarweb?.bounceRate && `Tasa de rebote web: ${Math.round(ds.similarweb.bounceRate * 100)}%`,
     `Resumen: ${attributes.summary}`,
   ]
     .filter(Boolean)

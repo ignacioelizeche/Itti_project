@@ -18,8 +18,8 @@
   "dependencies": {
     "@fastify/cors": "^10.0.0",
     "@fastify/rate-limit": "^10.0.0",
-    "groq-sdk": "^1.2.1",
     "@prisma/client": "^6.0.0",
+    "apify-client": "^2.23.4",
     "bullmq": "^5.0.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.0",

@@ -4,6 +4,7 @@ import { searchPlaces } from "../services/scraper/google-places.js";
 import { scrapePaginasAmarillas, scrapeGuiaCommercial, ASUNCION_COORDS } from "../services/scraper/directories.js";
 import { scrapeWebsite } from "../services/scraper/web-scraper.js";
 import { normalizeBatch } from "../services/scraper/normalizer.js";
+import { enrichCompany } from "../services/enrichment.js";
 
 const prisma = new PrismaClient();
 
@@ -160,6 +161,25 @@ const scrapeWorker = new Worker(
         errors.push(
           ...Array(result.errors).fill("normalize_error")
         );
+
+        // Auto-enrich new companies (fire and forget)
+        if (newCompanies > 0) {
+          console.log(`[ScrapeWorker] Auto-enriching ${newCompanies} new companies...`);
+          // Get recently created companies that need enrichment
+          const recentCompanies = await prisma.company.findMany({
+            where: {
+              lastScrapedAt: { not: null },
+              instagramFollowers: null,
+            },
+            orderBy: { createdAt: "desc" },
+            take: newCompanies,
+          });
+          for (const company of recentCompanies) {
+            enrichCompany(company.id).catch((err) => {
+              console.error(`[ScrapeWorker] Auto-enrich failed for ${company.name}:`, err);
+            });
+          }
+        }
       }
 
       // Mark job as completed

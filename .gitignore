@@ -8,9 +8,7 @@ dist/
 *.tsbuildinfo
 packages/api/prisma/migrations/
 packages/api/prisma/migration_lock.toml
+.obsidian/
 
 # Ueno alliances (datos sensibles)
 ueno alianzas/
-
-# Reportes internos
-REPORTE-ACTUAL.md

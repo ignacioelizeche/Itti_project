@@ -13,11 +13,11 @@ import {
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/discover", label: "Descubrir", icon: Sparkles },
   { href: "/search", label: "Búsqueda", icon: Search },
   { href: "/companies", label: "Empresas", icon: Building2 },
-  { href: "/scoring", label: "Scoring", icon: Sparkles },
-  { href: "/enrichment", label: "Enriquecimiento", icon: Layers },
-  { href: "/scrape", label: "Recolección", icon: Database },
+  { href: "/scoring", label: "Scoring", icon: Database },
+  { href: "/enrichment", label: "Decisiones", icon: Layers },
 ];
 
 export function Sidebar() {

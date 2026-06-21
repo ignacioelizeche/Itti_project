@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import { scrapeInstagram, extractInstagramUsername } from "./scraper/instagram.js";
+import { scrapeInstagramViaApify } from "./scraper/instagram-apify.js";
+import { extractInstagramUsername } from "./scraper/instagram.js";
 import { scrapeSimilarWeb, extractDomain } from "./scraper/similarweb.js";
 import { scrapeFacebook, extractFacebookUrl } from "./scraper/facebook.js";
 
@@ -42,7 +43,12 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
     facebook: null,
   };
 
-  // 1. Instagram scraping
+  const dataSourcesUpdate: Record<string, any> = {
+    ...(company.dataSources as Record<string, any> || {}),
+  };
+  const dbUpdate: Record<string, any> = {};
+
+  // 1. Instagram scraping via Apify
   try {
     const igUsername = await extractInstagramUsername(
       company.website || undefined,
@@ -50,22 +56,45 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
     );
 
     if (igUsername) {
-      const igData = await scrapeInstagram(igUsername);
+      const igData = await scrapeInstagramViaApify(igUsername);
       if (igData) {
+        const avgLikes =
+          igData.recentPosts.length > 0
+            ? igData.recentPosts.reduce((s, p) => s + p.likesCount, 0) /
+              igData.recentPosts.length
+            : 0;
+        const avgComments =
+          igData.recentPosts.length > 0
+            ? igData.recentPosts.reduce((s, p) => s + p.commentsCount, 0) /
+              igData.recentPosts.length
+            : 0;
+        const engagementRate =
+          igData.followersCount > 0
+            ? Math.round(
+                ((avgLikes + avgComments) / igData.followersCount) * 10000
+              ) / 100
+            : 0;
+
         result.instagram = {
           scraped: true,
-          followers: igData.followers,
-          engagementRate: igData.engagementRate,
+          followers: igData.followersCount,
+          engagementRate,
         };
 
-        // Update company in DB
-        await prisma.company.update({
-          where: { id: companyId },
-          data: {
-            instagram: igUsername,
-            instagramFollowers: igData.followers,
-          },
-        });
+        dbUpdate.instagram = igUsername;
+        dbUpdate.instagramFollowers = igData.followersCount;
+        dataSourcesUpdate.instagram = {
+          fullName: igData.fullName,
+          biography: igData.biography,
+          followersCount: igData.followersCount,
+          postsCount: igData.postsCount,
+          isBusinessAccount: igData.isBusinessAccount,
+          isVerified: igData.isVerified,
+          avgLikes: Math.round(avgLikes),
+          avgComments: Math.round(avgComments),
+          engagementRate,
+          scrapedAt: new Date().toISOString(),
+        };
       }
     }
   } catch (error) {
@@ -84,80 +113,48 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
           bounceRate: webData.bounceRate,
         };
 
-        // Store in data_sources or alliance_details
-        await prisma.company.update({
-          where: { id: companyId },
-          data: {
-            dataSources: {
-              ...(company.dataSources as object || {}),
-              similarweb: {
-                monthlyVisits: webData.monthlyVisits,
-                bounceRate: webData.bounceRate,
-                pagesPerVisit: webData.pagesPerVisit,
-                rank: webData.rank,
-              },
-            },
-          },
-        });
+        dataSourcesUpdate.similarweb = {
+          monthlyVisits: webData.monthlyVisits,
+          bounceRate: webData.bounceRate,
+          pagesPerVisit: webData.pagesPerVisit,
+          rank: webData.rank,
+        };
       }
     }
   } catch (error) {
     console.error(`SimilarWeb enrichment failed for ${company.name}:`, error);
   }
 
-  // 3. Facebook scraping
+  // 3. Facebook - skip scraping (blocked by Facebook), just save the handle
   try {
     const fbUsername = company.facebook
       || extractFacebookUrl(company.website || "")
       || extractFacebookUrl(company.description || "");
 
     if (fbUsername) {
-      const fbData = await scrapeFacebook(fbUsername);
-      if (fbData) {
-        result.facebook = {
-          scraped: true,
-          followers: fbData.followers,
-          rating: fbData.rating,
-        };
-
-        await prisma.company.update({
-          where: { id: companyId },
-          data: {
-            facebook: fbUsername,
-            dataSources: {
-              ...(company.dataSources as object || {}),
-              facebook: {
-                followers: fbData.followers,
-                likes: fbData.likes,
-                rating: fbData.rating,
-                reviewCount: fbData.reviewCount,
-              },
-            },
-          },
-        });
-      }
+      dbUpdate.facebook = fbUsername;
     }
   } catch (error) {
     console.error(`Facebook enrichment failed for ${company.name}:`, error);
   }
 
-  // Update last_scraped_at
+  // Single DB update with all accumulated data
+  dbUpdate.dataSources = dataSourcesUpdate;
+  dbUpdate.lastScrapedAt = new Date();
+
   await prisma.company.update({
     where: { id: companyId },
-    data: { lastScrapedAt: new Date() },
+    data: dbUpdate,
   });
 
   return result;
 }
 
 export async function enrichBatch(limit: number = 10): Promise<number> {
-  // Get companies that haven't been enriched recently (no instagram data and no last_scraped_at)
   const companies = await prisma.company.findMany({
     where: {
-      OR: [
-        { instagramFollowers: null },
-        { lastScrapedAt: null },
-      ],
+      instagram: { not: null },
+      instagramFollowers: null,
     },
     take: limit,
     orderBy: { id: "asc" },

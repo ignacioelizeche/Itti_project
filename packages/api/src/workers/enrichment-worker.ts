@@ -1,6 +1,8 @@
 import { Worker } from "bullmq";
-import { prisma } from "../index.js";
+import { PrismaClient } from "@prisma/client";
 import { enrichCompany, enrichBatch } from "../services/enrichment.js";
+
+const prisma = new PrismaClient();
 
 const connection = { host: "localhost", port: 6379 };
 

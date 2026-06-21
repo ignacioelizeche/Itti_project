@@ -24,6 +24,18 @@ import {
 import Link from "next/link";
 
 interface EnrichedData {
+  instagram?: {
+    fullName: string;
+    biography: string;
+    followersCount: number;
+    postsCount: number;
+    isBusinessAccount: boolean;
+    isVerified: boolean;
+    avgLikes: number;
+    avgComments: number;
+    engagementRate: number;
+    scrapedAt: string;
+  };
   webTraffic?: {
     monthlyVisits: number;
     bounceRate: number;
@@ -59,35 +71,19 @@ export default function CompanyDetailPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    api
-      .getTopCompanies(1000)
-      .then((res) => {
-        const found = res.companies.find((c) => c.id === id);
-        if (found) {
-          return api.search(found.name, { limit: 1 }).then((searchRes) => {
-            const match = searchRes.results.find((r) => r.companyId === id);
-            setCompany({
-              ...found,
-              analysis: match
-                ? {
-                    summary: match.summary,
-                    recommendation: match.recommendation,
-                    strengths: null,
-                    weaknesses: null,
-                  }
-                : undefined,
-            });
-            setEditData({
-              website: found.website || "",
-              instagram: found.instagram || "",
-              facebook: found.facebook || "",
-              phone: (found as any).phone || "",
-            });
-          });
-        }
+    fetch(`/api/scores/company/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setCompany(data);
+        setEditData({
+          website: data.website || "",
+          instagram: data.instagram || "",
+          facebook: data.facebook || "",
+          phone: data.phone || "",
+        });
+        setLoading(false);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(() => setLoading(false));
   }, [id]);
 
   const handleSave = async () => {
@@ -101,9 +97,8 @@ export default function CompanyDetailPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage("Datos actualizados");
+        setMessage(data.message || "Datos actualizados");
         setEditing(false);
-        // Update local state
         setCompany((prev) =>
           prev
             ? {
@@ -114,6 +109,13 @@ export default function CompanyDetailPage() {
               }
             : prev
         );
+        // If enrichment was triggered, refresh data after a delay
+        if (data.message?.includes("Enriqueciendo")) {
+          setTimeout(async () => {
+            const updated = await fetch(`/api/scores/company/${id}`).then((r) => r.json());
+            setCompany(updated);
+          }, 5000);
+        }
       } else {
         setMessage(data.error || "Error al guardar");
       }
@@ -128,18 +130,22 @@ export default function CompanyDetailPage() {
     setAnalyzing(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/scores/analyze/${id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force: true }),
-      });
-      const data = await res.json();
-      setMessage(data.message || "Análisis iniciado");
-      // Refresh data after a delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 15000);
-    } catch (err) {
+      const res = await api.analyzeCompany(Number(id), true);
+      setMessage(res.message || "Procesando (enriquecimiento + análisis)...");
+      // Poll for results
+      const poll = setInterval(async () => {
+        try {
+          const updated = await fetch(`/api/scores/company/${id}`).then((r) => r.json());
+          if (updated.score) {
+            setCompany(updated);
+            setMessage("Análisis completado");
+            clearInterval(poll);
+          }
+        } catch {}
+      }, 5000);
+      // Stop polling after 60s
+      setTimeout(() => clearInterval(poll), 60000);
+    } catch {
       setMessage("Error al analizar");
     } finally {
       setAnalyzing(false);
@@ -216,20 +222,59 @@ export default function CompanyDetailPage() {
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
-              className="flex items-center gap-2 px-4 py-2 bg-ueno-blue text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
             >
               {analyzing ? (
                 <RefreshCw size={14} className="animate-spin" />
               ) : (
                 <RefreshCw size={14} />
               )}
-              {analyzing ? "Analizando..." : "Re-analizar"}
+              {analyzing ? "Procesando..." : "Enriquecer + Analizar"}
             </button>
           </div>
         </div>
         {message && (
           <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-lg text-sm">
             {message}
+          </div>
+        )}
+
+        {/* Decision Buttons */}
+        {score !== null && (
+          <div className="mt-4 flex items-center gap-3">
+            <span className="text-sm text-gray-500">Decisión:</span>
+            {(company as any).humanDecision ? (
+              <span className={`text-sm font-medium px-3 py-1 rounded-full ${
+                (company as any).humanDecision === "approved"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+              }`}>
+                {(company as any).humanDecision === "approved" ? "✓ Aprobado" : "✗ Rechazado"}
+              </span>
+            ) : (
+              <>
+                <button
+                  onClick={async () => {
+                    const res = await api.decide(id, "approved");
+                    setMessage(res.message);
+                    setCompany((prev) => prev ? { ...prev, humanDecision: "approved" } as any : prev);
+                  }}
+                  className="flex items-center gap-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600"
+                >
+                  <Check size={14} /> Aprobar
+                </button>
+                <button
+                  onClick={async () => {
+                    const res = await api.decide(id, "rejected");
+                    setMessage(res.message);
+                    setCompany((prev) => prev ? { ...prev, humanDecision: "rejected" } as any : prev);
+                  }}
+                  className="flex items-center gap-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"
+                >
+                  <X size={14} /> Rechazar
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -408,8 +453,41 @@ export default function CompanyDetailPage() {
           <div className="flex items-center gap-2 mb-3">
             <Instagram size={18} className="text-pink-600" />
             <h3 className="font-medium text-gray-900">Instagram</h3>
+            {dataSources?.instagram?.isVerified && (
+              <span className="text-blue-500 text-xs font-bold">✓ Verificado</span>
+            )}
           </div>
-          {company.instagramFollowers ? (
+          {dataSources?.instagram ? (
+            <div className="space-y-2">
+              <div>
+                <div className="text-2xl font-bold text-pink-600">
+                  {formatNumber(dataSources.instagram.followersCount)}
+                </div>
+                <div className="text-sm text-gray-500">seguidores</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-400">Posts</span>
+                  <div className="font-medium">{formatNumber(dataSources.instagram.postsCount)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-400">Engagement</span>
+                  <div className="font-medium">{dataSources.instagram.engagementRate}%</div>
+                </div>
+                <div>
+                  <span className="text-gray-400">Likes/post</span>
+                  <div className="font-medium">{formatNumber(dataSources.instagram.avgLikes)}</div>
+                </div>
+                <div>
+                  <span className="text-gray-400">Comments/post</span>
+                  <div className="font-medium">{formatNumber(dataSources.instagram.avgComments)}</div>
+                </div>
+              </div>
+              {dataSources.instagram.biography && (
+                <div className="text-xs text-gray-400 truncate">{dataSources.instagram.biography}</div>
+              )}
+            </div>
+          ) : company.instagramFollowers ? (
             <div>
               <div className="text-2xl font-bold text-pink-600">
                 {formatNumber(company.instagramFollowers)}

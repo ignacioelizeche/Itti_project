@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
+import { PrismaClient } from "@prisma/client";
 import { semanticSearch, hybridSearch } from "../services/search/semantic.js";
+
+const prisma = new PrismaClient();
 
 export async function searchRoutes(fastify: FastifyInstance) {
   // POST /api/search - Semantic search

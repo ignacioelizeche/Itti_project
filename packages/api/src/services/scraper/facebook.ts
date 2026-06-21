@@ -78,6 +78,12 @@ export async function scrapeFacebook(pageName: string): Promise<FacebookData | n
 }
 
 export function extractFacebookUrl(text: string): string | null {
-  const match = text.match(/facebook\.com\/([a-zA-Z0-9.]+)/);
-  return match ? match[1] : null;
+  const match = text.match(/facebook\.com\/([a-zA-Z0-9.]+)(?:\/|\?|$)/);
+  if (!match) return null;
+  const page = match[1];
+  // Ignore generic Facebook pages
+  if (["profile.php", "pages", "login", "signup", "recover", "help", "policies", "groups"].includes(page)) {
+    return null;
+  }
+  return page;
 }

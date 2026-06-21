@@ -32,6 +32,9 @@ model Company {
   allianceStatus     String?   @map("alliance_status")  // active, inactive, prospect
   allianceDetails    Json?     @map("alliance_details") // benefit type, conditions, etc.
   tags               Json?                            // flexible tags
+  humanDecision      String?   @map("human_decision")   // approved, rejected, null (pending)
+  humanNote          String?   @map("human_note")       // rationale for decision
+  decidedAt          DateTime? @map("decided_at")
   lastScrapedAt      DateTime? @map("last_scraped_at")
   dataSources        Json?     @map("data_sources")
   createdAt          DateTime  @default(now()) @map("created_at")

@@ -3,7 +3,8 @@ import { PrismaClient } from "@prisma/client";
 import { extractCompanyAttributes } from "../services/ai/analyzer.js";
 import { calculateAffinityScore } from "../services/ai/scorer.js";
 import { generateAndStoreEmbedding } from "../services/ai/embeddings.js";
-import { chatCompletion } from "../services/ai/groq-client.js";
+import { chatCompletion } from "../services/ai/llm-client.js";
+import { enrichCompany } from "../services/enrichment.js";
 
 const prisma = new PrismaClient();
 
@@ -33,7 +34,7 @@ El párrafo debe:
 Sé directo y profesional. Usa datos concretos cuando estén disponibles.`;
 
 async function analyzeCompany(companyId: number): Promise<void> {
-  const company = await prisma.company.findUnique({
+  let company = await prisma.company.findUnique({
     where: { id: companyId },
     include: { score: true, analysis: true },
   });
@@ -41,6 +42,23 @@ async function analyzeCompany(companyId: number): Promise<void> {
   if (!company) throw new Error(`Company ${companyId} not found`);
 
   console.log(`[AnalyzeWorker] Analyzing: ${company.name}`);
+
+  // Step 0: Enrich first if not yet enriched (auto-enrichment)
+  if (!company.instagramFollowers && !company.lastScrapedAt) {
+    console.log(`[AnalyzeWorker] Auto-enriching ${company.name} before analysis...`);
+    try {
+      await enrichCompany(companyId);
+      // Reload company with enriched data
+      const reloaded = await prisma.company.findUnique({
+        where: { id: companyId },
+        include: { score: true, analysis: true },
+      });
+      if (reloaded) company = reloaded;
+      console.log(`[AnalyzeWorker] Enrichment completed for ${company.name}`);
+    } catch (err) {
+      console.warn(`[AnalyzeWorker] Enrichment failed for ${company.name}, continuing with analysis`);
+    }
+  }
 
   // Step 1: Extract attributes
   const attributes = await extractCompanyAttributes(company.name, {
@@ -72,6 +90,8 @@ async function analyzeCompany(companyId: number): Promise<void> {
       city: company.city ?? undefined,
       allianceStatus: company.allianceStatus ?? undefined,
       allianceDetails: (company.allianceDetails as Record<string, unknown>) ?? undefined,
+      instagramFollowers: company.instagramFollowers ?? undefined,
+      dataSources: (company.dataSources as Record<string, unknown>) ?? undefined,
     }
   );
 
@@ -159,7 +179,7 @@ Genera el párrafo de justificación.`,
         .join("; "),
       recommendation: justification,
       fullAnalysis: justification,
-      modelUsed: "llama-3.3-70b-versatile",
+      modelUsed: "llama3.1:8b (Ollama local)",
     },
     update: {
       summary: attributes.summary,
@@ -180,7 +200,7 @@ Genera el párrafo de justificación.`,
         .join("; "),
       recommendation: justification,
       fullAnalysis: justification,
-      modelUsed: "llama-3.3-70b-versatile",
+      modelUsed: "llama3.1:8b (Ollama local)",
       createdAt: new Date(),
     },
   });
@@ -212,6 +232,8 @@ const analyzeWorker = new Worker(
     }
 
     await analyzeCompany(companyId);
+    // Delay between jobs to respect 30 RPM limit (3 calls per company)
+    await new Promise((r) => setTimeout(r, 6500));
     return { success: true };
   },
   {

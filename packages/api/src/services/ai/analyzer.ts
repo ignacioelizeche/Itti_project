@@ -1,4 +1,4 @@
-import { chatCompletionJSON } from "./groq-client.js";
+import { chatCompletionJSON } from "./llm-client.js";
 
 interface CompanyAttributes {
   industry: string;

@@ -113,6 +113,29 @@ export const api = {
       body: JSON.stringify({ category, limit }),
     }),
 
+  fullFlowBatch: (category?: string, limit = 50, force = false) =>
+    fetchAPI<{ message: string; note: string }>("/scores/full-flow", {
+      method: "POST",
+      body: JSON.stringify({ category, limit, force }),
+    }),
+
+  decide: (companyId: number, decision: "approved" | "rejected", note?: string) =>
+    fetchAPI<{ message: string; company: { id: number; humanDecision: string | null } }>(
+      `/scores/decide/${companyId}`,
+      { method: "POST", body: JSON.stringify({ decision, note }) }
+    ),
+
+  getDecisions: (filter?: string) =>
+    fetchAPI<{ companies: any[]; total: number; approved: number; rejected: number; pending: number }>(
+      `/scores/decisions${filter ? `?filter=${filter}` : ""}`
+    ),
+
+  discover: (query: string, autoEnrich = true) =>
+    fetchAPI<{ generatedQueries: string[]; totalFound: number; saved: number; newCompanies: number; companies: any[] }>(
+      "/discover",
+      { method: "POST", body: JSON.stringify({ query, autoEnrich }) }
+    ),
+
   search: (query: string, options?: { limit?: number; category?: string; minScore?: number }) =>
     fetchAPI<{ results: SearchResult[]; total: number }>("/search", {
       method: "POST",

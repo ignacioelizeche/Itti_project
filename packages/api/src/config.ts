@@ -12,14 +12,10 @@ export const config = {
     url: process.env.REDIS_URL || "redis://localhost:6379",
   },
 
-  groq: {
-    apiKey: process.env.GROQ_API_KEY || "",
-  },
-
   ollama: {
     url: process.env.OLLAMA_URL || "http://192.168.2.33:30068",
     embedModel: process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text",
-    chatModel: process.env.OLLAMA_CHAT_MODEL || "llama3.1",
+    chatModel: process.env.OLLAMA_CHAT_MODEL || "llama3.1:8b",
   },
 
   google: {

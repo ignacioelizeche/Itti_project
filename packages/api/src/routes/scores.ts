@@ -1,10 +1,37 @@
 import type { FastifyInstance } from "fastify";
 import { PrismaClient } from "@prisma/client";
 import { analyzeQueue } from "../workers/analyze-worker.js";
+import { enrichCompany } from "../services/enrichment.js";
 
 const prisma = new PrismaClient();
 
 export async function scoreRoutes(fastify: FastifyInstance) {
+  // GET /api/scores/company/:companyId - Get company with all data
+  fastify.get<{
+    Params: { companyId: string };
+  }>("/company/:companyId", async (request, reply) => {
+    const { companyId } = request.params;
+
+    const company = await prisma.company.findUnique({
+      where: { id: parseInt(companyId) },
+      include: {
+        score: true,
+        analysis: true,
+      },
+    });
+
+    if (!company) {
+      return reply.status(404).send({ error: "Company not found" });
+    }
+
+    return {
+      ...company,
+      createdAt: company.createdAt?.toISOString(),
+      updatedAt: company.updatedAt?.toISOString(),
+      lastScrapedAt: company.lastScrapedAt?.toISOString(),
+    };
+  });
+
   // PATCH /api/scores/company/:companyId - Update company data
   fastify.patch<{
     Params: { companyId: string };
@@ -52,8 +79,19 @@ export async function scoreRoutes(fastify: FastifyInstance) {
       data: updateData,
     });
 
+    // Auto-enrich after saving if Instagram or Facebook was provided
+    const hasNewSocial = (instagram && updated.instagram) || (facebook && updated.facebook);
+    if (hasNewSocial) {
+      console.log(`[API] Auto-enriching ${updated.name} after contact update`);
+      enrichCompany(updated.id).catch((err) =>
+        console.error(`[API] Auto-enrich failed for ${updated.name}:`, err.message)
+      );
+    }
+
     return {
-      message: "Company updated",
+      message: hasNewSocial
+        ? "Datos actualizados. Enriqueciendo redes sociales..."
+        : "Datos actualizados",
       company: {
         id: updated.id,
         name: updated.name,
@@ -62,6 +100,94 @@ export async function scoreRoutes(fastify: FastifyInstance) {
         facebook: updated.facebook,
         phone: updated.phone,
       },
+    };
+  });
+
+  // POST /api/scores/decide/:companyId - Approve or reject alliance
+  fastify.post<{
+    Params: { companyId: string };
+    Body: { decision: "approved" | "rejected"; note?: string };
+  }>("/decide/:companyId", async (request, reply) => {
+    const { companyId } = request.params;
+    const { decision, note } = request.body;
+
+    if (!["approved", "rejected"].includes(decision)) {
+      return reply.status(400).send({ error: "Decision must be 'approved' or 'rejected'" });
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: parseInt(companyId) },
+    });
+
+    if (!company) {
+      return reply.status(404).send({ error: "Company not found" });
+    }
+
+    const updated = await prisma.company.update({
+      where: { id: parseInt(companyId) },
+      data: {
+        humanDecision: decision,
+        humanNote: note || null,
+        decidedAt: new Date(),
+      },
+    });
+
+    return {
+      message: `Alliance ${decision}`,
+      company: {
+        id: updated.id,
+        name: updated.name,
+        humanDecision: updated.humanDecision,
+        humanNote: updated.humanNote,
+      },
+    };
+  });
+
+  // GET /api/scores/decisions - Get companies with decisions
+  fastify.get<{
+    Querystring: { filter?: string; limit?: string };
+  }>("/decisions", async (request) => {
+    const { filter, limit = "100" } = request.query;
+
+    const where: any = {};
+    if (filter === "pending") {
+      where.humanDecision = null;
+      where.score = { isNot: null };
+    } else if (filter === "decided") {
+      where.humanDecision = { not: null };
+    }
+    // "all" = no filter
+
+    const companies = await prisma.company.findMany({
+      where,
+      include: {
+        score: { select: { totalScore: true, scoreLabel: true } },
+      },
+      orderBy: { id: "desc" },
+      take: parseInt(limit),
+    });
+
+    const approved = await prisma.company.count({ where: { humanDecision: "approved" } });
+    const rejected = await prisma.company.count({ where: { humanDecision: "rejected" } });
+    const pending = await prisma.company.count({ where: { humanDecision: null, score: { isNot: null } } });
+
+    return {
+      companies: companies.map((c) => ({
+        id: c.id,
+        name: c.name,
+        category: c.category,
+        website: c.website,
+        instagramFollowers: c.instagramFollowers,
+        score: c.score?.totalScore ? Number(c.score.totalScore) : null,
+        scoreLabel: c.score?.scoreLabel,
+        humanDecision: c.humanDecision,
+        humanNote: c.humanNote,
+        decidedAt: c.decidedAt,
+      })),
+      total: companies.length,
+      approved,
+      rejected,
+      pending,
     };
   });
 
@@ -191,8 +317,8 @@ export async function scoreRoutes(fastify: FastifyInstance) {
       `analyze-${companyId}`,
       { companyId: parseInt(companyId), force },
       {
-        attempts: 2,
-        backoff: { type: "exponential", delay: 5000 },
+        attempts: 3,
+        backoff: { type: "exponential", delay: 30000 },
       }
     );
 
@@ -227,16 +353,54 @@ export async function scoreRoutes(fastify: FastifyInstance) {
         `analyze-${company.id}`,
         { companyId: company.id, force },
         {
-          attempts: 2,
-          backoff: { type: "exponential", delay: 5000 },
+          attempts: 3,
+          backoff: { type: "exponential", delay: 30000 },
         }
       );
       queued++;
     }
 
     return {
-      message: `Queued ${queued} companies for analysis`,
+      message: `Queued ${queued} companies for full pipeline (enrichment + analysis)`,
       category: category || "all",
+    };
+  });
+
+  // POST /api/scores/full-flow - Enrich + Analyze batch
+  fastify.post<{
+    Body: { category?: string; limit?: number; force?: boolean };
+  }>("/full-flow", async (request) => {
+    const { category, limit = 50, force = false } = request.body;
+
+    const where: Record<string, unknown> = {};
+    if (category) where.category = category;
+    if (!force) {
+      where.score = { is: null };
+    }
+
+    const companies = await prisma.company.findMany({
+      where,
+      select: { id: true, name: true },
+      take: limit,
+    });
+
+    let queued = 0;
+    for (const company of companies) {
+      await analyzeQueue.add(
+        `analyze-${company.id}`,
+        { companyId: company.id, force },
+        {
+          attempts: 3,
+          backoff: { type: "exponential", delay: 30000 },
+        }
+      );
+      queued++;
+    }
+
+    return {
+      message: `Queued ${queued} companies for full pipeline (enrichment + analysis)`,
+      category: category || "all",
+      note: "Each company will be enriched first (Instagram, SimilarWeb, Facebook) then analyzed with AI",
     };
   });
 

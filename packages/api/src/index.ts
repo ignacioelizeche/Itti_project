@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { Worker } from "bullmq";
 import { config } from "./config.js";
 import prismaPlugin from "./plugins/prisma.js";
 import corsPlugin from "./plugins/cors.js";
@@ -7,6 +8,8 @@ import { scrapeRoutes } from "./routes/scrape.js";
 import { scoreRoutes } from "./routes/scores.js";
 import { searchRoutes } from "./routes/search.js";
 import { enrichmentRoutes } from "./routes/enrichment.js";
+import { discoverRoutes } from "./routes/discover.js";
+import { enrichCompany, enrichBatch } from "./services/enrichment.js";
 
 const fastify = Fastify({
   logger: {
@@ -29,11 +32,49 @@ async function bootstrap() {
   await fastify.register(scoreRoutes, { prefix: "/api/scores" });
   await fastify.register(searchRoutes, { prefix: "/api/search" });
   await fastify.register(enrichmentRoutes, { prefix: "/api/enrich" });
+  await fastify.register(discoverRoutes, { prefix: "/api/discover" });
   console.log("Routes registered");
 
   // Health check
   fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
+  });
+
+  // Start enrichment worker in-process (non-blocking)
+  const enrichmentWorker = new Worker(
+    "enrichment",
+    async (job) => {
+      const { companyId, batch, limit } = job.data;
+      if (batch) {
+        const enriched = await enrichBatch(limit || 10);
+        return { enriched, type: "batch" };
+      }
+      if (companyId) {
+        const result = await enrichCompany(companyId);
+        return { result, type: "single" };
+      }
+      return { error: "No companyId or batch flag provided" };
+    },
+    { connection: { host: "localhost", port: 6379 }, concurrency: 1 }
+  );
+
+  enrichmentWorker.on("completed", (job) => {
+    console.log(`Enrichment job ${job.id} completed`);
+  });
+  enrichmentWorker.on("failed", (job, error) => {
+    console.error(`Enrichment job ${job?.id} failed:`, error.message);
+  });
+
+  // Graceful shutdown
+  fastify.addHook("onClose", async () => {
+    await enrichmentWorker.close();
+  });
+
+  process.on("SIGTERM", async () => {
+    await fastify.close();
+  });
+  process.on("SIGINT", async () => {
+    await fastify.close();
   });
 
   // Start server
