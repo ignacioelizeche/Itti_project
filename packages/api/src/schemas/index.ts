@@ -11,24 +11,10 @@ export const SearchSchema = z.object({
   category: z.string().optional(),
   minScore: z.number().min(0).max(100).optional(),
   city: z.string().optional(),
-});
-
-export const HybridSearchSchema = SearchSchema.extend({
   textFilter: z.string().optional(),
 });
 
 export const AnalyzeSchema = z.object({
-  force: z.boolean().optional().default(false),
-});
-
-export const AnalyzeBatchSchema = z.object({
-  category: z.string().optional(),
-  limit: z.number().int().min(1).max(500).optional().default(50),
-});
-
-export const FullFlowSchema = z.object({
-  category: z.string().optional(),
-  limit: z.number().int().min(1).max(500).optional().default(50),
   force: z.boolean().optional().default(false),
 });
 
@@ -52,15 +38,6 @@ export const ScrapeTriggerSchema = z.object({
     errorMap: () => ({ message: "Invalid source" }),
   }),
   category: z.string().optional(),
-});
-
-export const EnrichBatchSchema = z.object({
-  limit: z.number().int().min(1).max(100).optional().default(10),
-});
-
-export const PaginationSchema = z.object({
-  limit: z.string().optional().default("20"),
-  offset: z.string().optional().default("0"),
 });
 
 export const DecisionFilterSchema = z.object({

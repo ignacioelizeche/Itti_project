@@ -78,32 +78,3 @@ export async function generateAndStoreEmbedding(companyId: number): Promise<void
   }
 }
 
-export async function generateEmbeddingsBatch(
-  companyIds: number[]
-): Promise<{ generated: number; skipped: number; errors: number }> {
-  let generated = 0;
-  let skipped = 0;
-  let errors = 0;
-
-  for (const id of companyIds) {
-    try {
-      const existing = await prisma.$queryRawUnsafe<Array<{ id: number }>>(
-        'SELECT id FROM "CompanyEmbedding" WHERE company_id = $1',
-        id
-      );
-
-      if (existing.length > 0) {
-        skipped++;
-        continue;
-      }
-
-      await generateAndStoreEmbedding(id);
-      generated++;
-    } catch (error) {
-      console.error(`Error generating embedding for company ${id}:`, error);
-      errors++;
-    }
-  }
-
-  return { generated, skipped, errors };
-}

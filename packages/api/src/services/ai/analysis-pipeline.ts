@@ -5,12 +5,9 @@ import { calculateAffinityScore } from "./scorer.js";
 import { generateAndStoreEmbedding } from "./embeddings.js";
 import { chatCompletion } from "./llm-client.js";
 import { enrichCompany } from "../enrichment.js";
+import { getQueueConnection } from "../../lib/queue.js";
 
-const connectionConfig = {
-  host: "localhost",
-  port: 6379,
-  maxRetriesPerRequest: null,
-};
+const connectionConfig = getQueueConnection();
 
 export const analyzeQueue = new Queue("analyze", { connection: connectionConfig });
 

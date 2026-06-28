@@ -155,7 +155,7 @@ export async function calculateAffinityScore(
   }
 ): Promise<ScoreResult> {
   const ds = (rawData.dataSources as Record<string, any>) || {};
-  const digitalWeights = getDigitalPresenceWeights(rawData.category);
+  const digitalWeights = getDigitalPresenceWeights(rawData.category ?? null);
 
   const dataContext = [
     `Empresa: ${companyName}`,

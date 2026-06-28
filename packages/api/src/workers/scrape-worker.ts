@@ -6,12 +6,9 @@ import { scrapeWebsite } from "../services/scraper/web-scraper.js";
 import { normalizeBatch } from "../services/scraper/normalizer.js";
 import { enrichCompany } from "../services/enrichment.js";
 import { analyzeQueue } from "../services/ai/analysis-pipeline.js";
+import { getQueueConnection } from "../lib/queue.js";
 
-const connectionConfig = {
-  host: "localhost",
-  port: 6379,
-  maxRetriesPerRequest: null,
-};
+const connectionConfig = getQueueConnection();
 
 // Queue for scraping jobs
 export const scrapeQueue = new Queue("scrape", { connection: connectionConfig });

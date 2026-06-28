@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { Queue } from "bullmq";
+import { getQueueConnection } from "../lib/queue.js";
 
 const enrichmentQueue = new Queue("enrichment", {
-  connection: { host: "localhost", port: 6379 },
+  connection: getQueueConnection(),
 });
 
 export async function enrichmentRoutes(fastify: FastifyInstance) {

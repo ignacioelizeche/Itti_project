@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import https from "https";
+import { BROWSER_USER_AGENT } from "../../utils/consts.js";
 
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
@@ -22,6 +23,7 @@ export interface WebTrafficData {
   hasWhatsApp?: boolean;
   socialLinks?: string[];
   language?: string;
+  qualityScore?: number;
 }
 
 export async function scrapeSimilarWeb(domain: string): Promise<WebTrafficData | null> {
@@ -44,8 +46,7 @@ export async function scrapeSimilarWeb(domain: string): Promise<WebTrafficData |
     try {
       const response = await axios.get(url, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "User-Agent": BROWSER_USER_AGENT,
           Accept: "text/html,application/xhtml+xml",
           "Accept-Language": "es-PY,es;q=0.9,en;q=0.8",
         },

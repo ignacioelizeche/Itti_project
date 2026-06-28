@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { scrapeQueue } from "../workers/scrape-worker.js";
 import { prisma } from "../lib/prisma.js";
 import { ScrapeTriggerSchema } from "../schemas/index.js";
+import { validateOrReply } from "../lib/validate.js";
 
 const CATEGORIES = [
   "Restaurantes",
@@ -14,12 +15,10 @@ const CATEGORIES = [
 export async function scrapeRoutes(fastify: FastifyInstance) {
   // POST /api/scrape/trigger - Start a new scraping job
   fastify.post("/trigger", async (request, reply) => {
-    const parseResult = ScrapeTriggerSchema.safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: parseResult.error.issues[0].message });
-    }
+    const data = validateOrReply(ScrapeTriggerSchema, request.body, reply);
+    if (!data) return;
 
-    const { source, category } = parseResult.data;
+    const { source, category } = data;
 
     const categoriesToScrape = category ? [category] : CATEGORIES;
     const jobs: number[] = [];

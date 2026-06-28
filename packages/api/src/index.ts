@@ -11,6 +11,7 @@ import { searchRoutes } from "./routes/search.js";
 import { enrichmentRoutes } from "./routes/enrichment.js";
 import { discoverRoutes } from "./routes/discover.js";
 import { enrichCompany, enrichBatch } from "./services/enrichment.js";
+import { getQueueConnection } from "./lib/queue.js";
 
 const fastify = Fastify({
   logger: {
@@ -58,7 +59,7 @@ async function bootstrap() {
       }
       return { error: "No companyId or batch flag provided" };
     },
-    { connection: { host: "localhost", port: 6379 }, concurrency: 1 }
+    { connection: getQueueConnection(), concurrency: 1 }
   );
 
   enrichmentWorker.on("completed", (job) => {

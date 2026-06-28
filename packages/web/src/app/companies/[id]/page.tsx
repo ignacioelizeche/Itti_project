@@ -6,6 +6,7 @@ import { api, type CompanyWithScore, type Analysis } from "@/lib/api";
 import { ScoreBadge } from "@/components/scoring/ScoreBadge";
 import { ScoreRadar } from "@/components/scoring/ScoreRadar";
 import { ScoreBreakdown } from "@/components/scoring/ScoreBreakdown";
+import { formatNumber } from "@/lib/utils";
 import {
   ArrowLeft,
   ExternalLink,
@@ -618,8 +619,4 @@ export default function CompanyDetailPage() {
   );
 }
 
-function formatNumber(num: number): string {
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
-  return String(num);
-}
+

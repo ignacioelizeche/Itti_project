@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { formatNumber } from "@/lib/utils";
 import { RefreshCw, Search, ExternalLink, Check, X } from "lucide-react";
 
 interface CompanyDecision {
@@ -188,8 +189,4 @@ export default function DecisionsPage() {
   );
 }
 
-function formatNumber(num: number): string {
-  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
-  return String(num);
-}
+

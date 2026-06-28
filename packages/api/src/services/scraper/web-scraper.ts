@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { RateLimiter } from "../../utils/rate-limiter.js";
+import { BROWSER_USER_AGENT } from "../../utils/consts.js";
 
 interface WebData {
   description?: string;
@@ -23,8 +24,7 @@ export async function scrapeWebsite(url: string): Promise<WebData | null> {
 
     const response = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": BROWSER_USER_AGENT,
         Accept: "text/html,application/xhtml+xml",
         "Accept-Language": "es-PY,es;q=0.9",
       },

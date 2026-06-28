@@ -7,6 +7,7 @@ import { enrichCompany } from "../services/enrichment.js";
 import { analyzeQueue } from "../services/ai/analysis-pipeline.js";
 import { ASUNCION_COORDS } from "../services/scraper/directories.js";
 import { DiscoverSchema } from "../schemas/index.js";
+import { validateOrReply } from "../lib/validate.js";
 
 const QUERY_GENERATION_PROMPT = (description: string) => `Sos un experto en marketing y negocios en Paraguay. Generá exactamente 3 consultas de búsqueda para Google Places basándote en esta descripción de lo que busca el usuario.
 
@@ -31,12 +32,10 @@ export async function discoverRoutes(fastify: FastifyInstance) {
       description: "Describe en lenguaje natural qué tipo de empresa buscás. La IA genera consultas de búsqueda, encuentra empresas, las guarda y las analiza automáticamente.",
     },
   }, async (request, reply) => {
-    const parseResult = DiscoverSchema.safeParse(request.body);
-    if (!parseResult.success) {
-      return reply.status(400).send({ error: parseResult.error.issues[0].message });
-    }
+    const data = validateOrReply(DiscoverSchema, request.body, reply);
+    if (!data) return;
 
-    const { query, autoEnrich } = parseResult.data;
+    const { query, autoEnrich } = data;
 
     try {
       // 1. Generate search queries with AI

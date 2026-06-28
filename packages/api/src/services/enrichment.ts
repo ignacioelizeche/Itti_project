@@ -105,14 +105,10 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
       const domain = extractDomain(company.website);
       const webData = await scrapeSimilarWeb(domain);
       if (webData) {
-        const data = webData as any;
         result.webTraffic = {
           scraped: true,
           monthlyVisits: webData.monthlyVisits,
           bounceRate: webData.bounceRate,
-          title: data.title || "",
-          description: data.description || "",
-          qualityScore: data.qualityScore || 0,
         };
 
         dataSourcesUpdate.similarweb = {
@@ -121,13 +117,13 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
           pagesPerVisit: webData.pagesPerVisit,
           rank: webData.rank,
           source: webData.source,
-          title: data.title || "",
-          description: data.description || "",
-          hasEshop: data.hasEshop || false,
-          hasContact: data.hasContact || false,
-          hasWhatsApp: data.hasWhatsApp || false,
-          socialLinks: data.socialLinks || [],
-          qualityScore: data.qualityScore || 0,
+          title: webData.title || "",
+          description: webData.description || "",
+          hasEshop: webData.hasEshop || false,
+          hasContact: webData.hasContact || false,
+          hasWhatsApp: webData.hasWhatsApp || false,
+          socialLinks: webData.socialLinks || [],
+          qualityScore: webData.qualityScore || 0,
         };
       }
     }
