@@ -1,15 +1,24 @@
 import type { FastifyInstance } from "fastify";
-import { PrismaClient } from "@prisma/client";
-import { analyzeQueue } from "../workers/analyze-worker.js";
+import { prisma } from "../lib/prisma.js";
+import { analyzeQueue } from "../services/ai/analysis-pipeline.js";
 import { enrichCompany } from "../services/enrichment.js";
-
-const prisma = new PrismaClient();
+import { AnalyzeSchema, DecideSchema, CompanyUpdateSchema, DecisionFilterSchema } from "../schemas/index.js";
 
 export async function scoreRoutes(fastify: FastifyInstance) {
   // GET /api/scores/company/:companyId - Get company with all data
   fastify.get<{
     Params: { companyId: string };
-  }>("/company/:companyId", async (request, reply) => {
+  }>("/company/:companyId", {
+    schema: {
+      tags: ["Scoring"],
+      summary: "Obtener empresa con datos completos",
+      params: {
+        type: "object",
+        properties: { companyId: { type: "string" } },
+      },
+      response: { 200: { type: "object" } },
+    },
+  }, async (request, reply) => {
     const { companyId } = request.params;
 
     const company = await prisma.company.findUnique({
@@ -35,15 +44,15 @@ export async function scoreRoutes(fastify: FastifyInstance) {
   // PATCH /api/scores/company/:companyId - Update company data
   fastify.patch<{
     Params: { companyId: string };
-    Body: {
-      website?: string;
-      instagram?: string;
-      facebook?: string;
-      phone?: string;
-    };
   }>("/company/:companyId", async (request, reply) => {
     const { companyId } = request.params;
-    const { website, instagram, facebook, phone } = request.body;
+
+    const parseResult = CompanyUpdateSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.issues[0].message });
+    }
+
+    const { website, instagram, facebook, phone } = parseResult.data;
 
     const company = await prisma.company.findUnique({
       where: { id: parseInt(companyId) },
@@ -106,14 +115,15 @@ export async function scoreRoutes(fastify: FastifyInstance) {
   // POST /api/scores/decide/:companyId - Approve or reject alliance
   fastify.post<{
     Params: { companyId: string };
-    Body: { decision: "approved" | "rejected"; note?: string };
   }>("/decide/:companyId", async (request, reply) => {
     const { companyId } = request.params;
-    const { decision, note } = request.body;
 
-    if (!["approved", "rejected"].includes(decision)) {
-      return reply.status(400).send({ error: "Decision must be 'approved' or 'rejected'" });
+    const parseResult = DecideSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.issues[0].message });
     }
+
+    const { decision, note } = parseResult.data;
 
     const company = await prisma.company.findUnique({
       where: { id: parseInt(companyId) },
@@ -147,7 +157,8 @@ export async function scoreRoutes(fastify: FastifyInstance) {
   fastify.get<{
     Querystring: { filter?: string; limit?: string };
   }>("/decisions", async (request) => {
-    const { filter, limit = "100" } = request.query;
+    const parseResult = DecisionFilterSchema.safeParse(request.query);
+    const { filter, limit } = parseResult.success ? parseResult.data : { filter: "all", limit: "100" };
 
     const where: any = {};
     if (filter === "pending") {
@@ -286,10 +297,21 @@ export async function scoreRoutes(fastify: FastifyInstance) {
   // POST /api/scores/analyze/:companyId - Trigger analysis for a company
   fastify.post<{
     Params: { companyId: string };
-    Body: { force?: boolean };
-  }>("/analyze/:companyId", async (request, reply) => {
+  }>("/analyze/:companyId", {
+    schema: {
+      tags: ["Scoring"],
+      summary: "Analizar empresa con IA",
+      params: { type: "object", properties: { companyId: { type: "string" } } },
+    },
+  }, async (request, reply) => {
     const { companyId } = request.params;
-    const { force = false } = request.body || {};
+
+    const parseResult = AnalyzeSchema.safeParse(request.body || {});
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.issues[0].message });
+    }
+
+    const { force } = parseResult.data;
 
     const company = await prisma.company.findUnique({
       where: { id: parseInt(companyId) },
@@ -332,7 +354,12 @@ export async function scoreRoutes(fastify: FastifyInstance) {
   // POST /api/scores/analyze-batch - Trigger batch analysis
   fastify.post<{
     Body: { category?: string; limit?: number; force?: boolean };
-  }>("/analyze-batch", async (request) => {
+  }>("/analyze-batch", {
+    schema: {
+      tags: ["Scoring"],
+      summary: "Analizar múltiples empresas en lote",
+    },
+  }, async (request) => {
     const { category, limit = 50, force = false } = request.body;
 
     const where: Record<string, unknown> = {};
@@ -369,7 +396,12 @@ export async function scoreRoutes(fastify: FastifyInstance) {
   // POST /api/scores/full-flow - Enrich + Analyze batch
   fastify.post<{
     Body: { category?: string; limit?: number; force?: boolean };
-  }>("/full-flow", async (request) => {
+  }>("/full-flow", {
+    schema: {
+      tags: ["Scoring"],
+      summary: "Pipeline completo: enriquecimiento + análisis",
+    },
+  }, async (request) => {
     const { category, limit = 50, force = false } = request.body;
 
     const where: Record<string, unknown> = {};
@@ -405,7 +437,12 @@ export async function scoreRoutes(fastify: FastifyInstance) {
   });
 
   // GET /api/scores/stats - Scoring statistics
-  fastify.get("/stats", async () => {
+  fastify.get("/stats", {
+    schema: {
+      tags: ["Scoring"],
+      summary: "Estadísticas de scoring",
+    },
+  }, async () => {
     const total = await prisma.company.count();
     const analyzed = await prisma.companyScore.count();
     const notAnalyzed = total - analyzed;

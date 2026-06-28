@@ -1,12 +1,10 @@
 import { Queue, Worker, Job } from "bullmq";
-import { PrismaClient } from "@prisma/client";
-import { extractCompanyAttributes } from "../services/ai/analyzer.js";
-import { calculateAffinityScore } from "../services/ai/scorer.js";
-import { generateAndStoreEmbedding } from "../services/ai/embeddings.js";
-import { chatCompletion } from "../services/ai/llm-client.js";
-import { enrichCompany } from "../services/enrichment.js";
-
-const prisma = new PrismaClient();
+import { prisma } from "../../lib/prisma.js";
+import { extractCompanyAttributes } from "./analyzer.js";
+import { calculateAffinityScore } from "./scorer.js";
+import { generateAndStoreEmbedding } from "./embeddings.js";
+import { chatCompletion } from "./llm-client.js";
+import { enrichCompany } from "../enrichment.js";
 
 const connectionConfig = {
   host: "localhost",

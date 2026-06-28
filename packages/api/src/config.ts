@@ -1,4 +1,9 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 export const config = {
   port: parseInt(process.env.API_PORT || "3001", 10),
@@ -20,5 +25,9 @@ export const config = {
 
   google: {
     mapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "",
+  },
+
+  facebook: {
+    appToken: process.env.FACEBOOK_APP_TOKEN || "",
   },
 };

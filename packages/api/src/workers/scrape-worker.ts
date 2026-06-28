@@ -1,12 +1,11 @@
 import { Queue, Worker, Job } from "bullmq";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma.js";
 import { searchPlaces } from "../services/scraper/google-places.js";
 import { scrapePaginasAmarillas, scrapeGuiaCommercial, ASUNCION_COORDS } from "../services/scraper/directories.js";
 import { scrapeWebsite } from "../services/scraper/web-scraper.js";
 import { normalizeBatch } from "../services/scraper/normalizer.js";
 import { enrichCompany } from "../services/enrichment.js";
-
-const prisma = new PrismaClient();
+import { analyzeQueue } from "../services/ai/analysis-pipeline.js";
 
 const connectionConfig = {
   host: "localhost",
@@ -177,6 +176,13 @@ const scrapeWorker = new Worker(
           for (const company of recentCompanies) {
             enrichCompany(company.id).catch((err) => {
               console.error(`[ScrapeWorker] Auto-enrich failed for ${company.name}:`, err);
+            });
+            // Queue for analysis
+            analyzeQueue.add(`analyze-${company.id}`, { companyId: company.id }, {
+              attempts: 2,
+              backoff: { type: "exponential", delay: 5000 },
+            }).catch((err) => {
+              console.error(`[ScrapeWorker] Failed to queue analysis for ${company.name}:`, err);
             });
           }
         }

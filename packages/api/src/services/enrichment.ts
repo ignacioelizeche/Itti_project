@@ -1,10 +1,8 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma.js";
 import { scrapeInstagramViaApify } from "./scraper/instagram-apify.js";
 import { extractInstagramUsername } from "./scraper/instagram.js";
 import { scrapeSimilarWeb, extractDomain } from "./scraper/similarweb.js";
-import { scrapeFacebook, extractFacebookUrl } from "./scraper/facebook.js";
-
-const prisma = new PrismaClient();
+import { scrapeFacebookByName, extractFacebookUrl } from "./scraper/facebook.js";
 
 export interface EnrichmentResult {
   companyId: number;
@@ -101,16 +99,20 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
     console.error(`Instagram enrichment failed for ${company.name}:`, error);
   }
 
-  // 2. SimilarWeb scraping
+  // 2. Website scraping - title, description, e-shop, contact, quality score
   try {
     if (company.website) {
       const domain = extractDomain(company.website);
       const webData = await scrapeSimilarWeb(domain);
       if (webData) {
+        const data = webData as any;
         result.webTraffic = {
           scraped: true,
           monthlyVisits: webData.monthlyVisits,
           bounceRate: webData.bounceRate,
+          title: data.title || "",
+          description: data.description || "",
+          qualityScore: data.qualityScore || 0,
         };
 
         dataSourcesUpdate.similarweb = {
@@ -118,14 +120,22 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
           bounceRate: webData.bounceRate,
           pagesPerVisit: webData.pagesPerVisit,
           rank: webData.rank,
+          source: webData.source,
+          title: data.title || "",
+          description: data.description || "",
+          hasEshop: data.hasEshop || false,
+          hasContact: data.hasContact || false,
+          hasWhatsApp: data.hasWhatsApp || false,
+          socialLinks: data.socialLinks || [],
+          qualityScore: data.qualityScore || 0,
         };
       }
     }
   } catch (error) {
-    console.error(`SimilarWeb enrichment failed for ${company.name}:`, error);
+    console.error(`Website scraping failed for ${company.name}:`, error);
   }
 
-  // 3. Facebook - skip scraping (blocked by Facebook), just save the handle
+  // 3. Facebook scraping via Apify
   try {
     const fbUsername = company.facebook
       || extractFacebookUrl(company.website || "")
@@ -133,6 +143,28 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
 
     if (fbUsername) {
       dbUpdate.facebook = fbUsername;
+
+      const fbData = await scrapeFacebookByName(company.name, fbUsername);
+      if (fbData) {
+        result.facebook = {
+          scraped: true,
+          followers: fbData.followers,
+          rating: 0,
+        };
+
+        dataSourcesUpdate.facebook = {
+          name: fbData.name,
+          followers: fbData.followers,
+          likes: fbData.likes,
+          rating: fbData.rating,
+          category: fbData.category,
+          phone: fbData.phone,
+          email: fbData.email,
+          website: fbData.website,
+          address: fbData.address,
+          scrapedAt: new Date().toISOString(),
+        };
+      }
     }
   } catch (error) {
     console.error(`Facebook enrichment failed for ${company.name}:`, error);

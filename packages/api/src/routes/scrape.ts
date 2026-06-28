@@ -1,8 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { scrapeQueue } from "../workers/scrape-worker.js";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma.js";
+import { ScrapeTriggerSchema } from "../schemas/index.js";
 
 const CATEGORIES = [
   "Restaurantes",
@@ -14,19 +13,13 @@ const CATEGORIES = [
 
 export async function scrapeRoutes(fastify: FastifyInstance) {
   // POST /api/scrape/trigger - Start a new scraping job
-  fastify.post<{
-    Body: {
-      source: "google_places" | "directories" | "web";
-      category?: string;
-    };
-  }>("/trigger", async (request, reply) => {
-    const { source, category } = request.body;
-
-    if (!source || !["google_places", "directories", "web"].includes(source)) {
-      return reply.status(400).send({
-        error: "Invalid source. Must be: google_places, directories, or web",
-      });
+  fastify.post("/trigger", async (request, reply) => {
+    const parseResult = ScrapeTriggerSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.issues[0].message });
     }
+
+    const { source, category } = parseResult.data;
 
     const categoriesToScrape = category ? [category] : CATEGORIES;
     const jobs: number[] = [];

@@ -28,6 +28,53 @@ const SCORE_WEIGHTS = {
   alliancePotential: 0.05,
 };
 
+function getDigitalPresenceWeights(category: string | null): { instagram: number; facebook: number; website: number } {
+  const cat = (category || "").toLowerCase();
+  
+  // E-commerce: website is most important
+  if (cat.includes("ecommerce") || cat.includes("tienda online") || cat.includes("marketplace")) {
+    return { instagram: 0.25, facebook: 0.25, website: 0.50 };
+  }
+  
+  // Food/Restaurants: Instagram is king
+  if (cat.includes("restaurant") || cat.includes("comida") || cat.includes("gastronom") || cat.includes("cafe") || cat.includes("cafetería")) {
+    return { instagram: 0.50, facebook: 0.30, website: 0.20 };
+  }
+  
+  // Fashion/Beauty: Instagram dominates
+  if (cat.includes("moda") || cat.includes("belleza") || cat.includes("fashion") || cat.includes("salón") || cat.includes("spa")) {
+    return { instagram: 0.60, facebook: 0.25, website: 0.15 };
+  }
+  
+  // Fitness/Gym: Instagram is key
+  if (cat.includes("fitness") || cat.includes("gym") || cat.includes("gimnasio") || cat.includes("deporte")) {
+    return { instagram: 0.55, facebook: 0.25, website: 0.20 };
+  }
+  
+  // Entertainment/Events: Instagram + Facebook
+  if (cat.includes("entretenimiento") || cat.includes("eventos") || cat.includes("cinema") || cat.includes("teatro")) {
+    return { instagram: 0.45, facebook: 0.40, website: 0.15 };
+  }
+  
+  // Technology/SaaS: Website matters more
+  if (cat.includes("tecnología") || cat.includes("software") || cat.includes("saas") || cat.includes("tech")) {
+    return { instagram: 0.20, facebook: 0.20, website: 0.60 };
+  }
+  
+  // Education: Website + Facebook
+  if (cat.includes("educación") || cat.includes("educacion") || cat.includes("school") || cat.includes("universidad")) {
+    return { instagram: 0.25, facebook: 0.35, website: 0.40 };
+  }
+  
+  // Supermarkets/Retail: Facebook + Website
+  if (cat.includes("supermercado") || cat.includes("retail") || cat.includes("tienda") || cat.includes("mercado")) {
+    return { instagram: 0.25, facebook: 0.40, website: 0.35 };
+  }
+  
+  // Default: Instagram first
+  return { instagram: 0.45, facebook: 0.30, website: 0.25 };
+}
+
 function getScoreLabel(total: number): string {
   if (total >= 85) return "Muy recomendable";
   if (total >= 70) return "Buena candidata";
@@ -45,7 +92,16 @@ CONTEXTO:
 PESOS DE EVALUACIÓN:
 - Audiencia (25%): Que el público objetivo coincida con usuarios de Ueno (jóvenes, urbanos, digitales)
 - Compatibilidad Ueno (20%): Que pueda ofrecer beneficios tangibles (descuentos, cashback, etc.)
-- Presencia digital (15%): Fuerte presencia en redes = más visibilidad para promociones
+- Presencia digital (15%): Evaluar Instagram, Facebook y sitio web. Los pesos varían según el rubro:
+  * Restaurantes/Cafeterías: Instagram 50%, Facebook 30%, Web 20%
+  * Moda/Belleza: Instagram 60%, Facebook 25%, Web 15%
+  * Fitness/Gimnasios: Instagram 55%, Facebook 25%, Web 20%
+  * E-commerce/Tiendas online: Instagram 25%, Facebook 25%, Web 50%
+  * Entretenimiento: Instagram 45%, Facebook 40%, Web 15%
+  * Tecnología/SaaS: Instagram 20%, Facebook 20%, Web 60%
+  * Educación: Instagram 25%, Facebook 35%, Web 40%
+  * Supermercados/Retail: Instagram 25%, Facebook 40%, Web 35%
+  * Otros: Instagram 45%, Facebook 30%, Web 25%
 - Reputación (12%): Ratings y reseñas altas = confianza
 - Rubro (10%): Que el sector sea relevante para el estilo de vida Ueno
 - Ubicación (8%): Zonas de alta concentración de usuarios
@@ -99,6 +155,7 @@ export async function calculateAffinityScore(
   }
 ): Promise<ScoreResult> {
   const ds = (rawData.dataSources as Record<string, any>) || {};
+  const digitalWeights = getDigitalPresenceWeights(rawData.category);
 
   const dataContext = [
     `Empresa: ${companyName}`,
@@ -117,6 +174,8 @@ export async function calculateAffinityScore(
     rawData.city && `Ubicación: ${rawData.city}, Paraguay`,
     rawData.allianceStatus === "active" && "⚠️ Ya es aliado activo de Ueno+",
     rawData.allianceDetails?.benefit && `Beneficio actual: ${rawData.allianceDetails.benefit}`,
+    "",
+    "=== PRESENCIA DIGITAL ===",
     rawData.instagramFollowers && `Instagram seguidores: ${rawData.instagramFollowers}`,
     ds.instagram?.engagementRate && `Instagram engagement rate: ${ds.instagram.engagementRate}%`,
     ds.instagram?.avgLikes && `Instagram likes promedio: ${ds.instagram.avgLikes}`,
@@ -124,8 +183,10 @@ export async function calculateAffinityScore(
     ds.instagram?.biography && `Instagram bio: ${ds.instagram.biography}`,
     ds.facebook?.followers && `Facebook seguidores: ${ds.facebook.followers}`,
     ds.facebook?.rating && `Facebook rating: ${ds.facebook.rating}/5`,
-    ds.similarweb?.monthlyVisits && `Tráfico web mensual estimado: ${ds.similarweb.monthlyVisits}`,
+    ds.similarweb?.monthlyVisits && `Tráfico web mensual: ${ds.similarweb.monthlyVisits}`,
     ds.similarweb?.bounceRate && `Tasa de rebote web: ${Math.round(ds.similarweb.bounceRate * 100)}%`,
+    "",
+    `Pesos digitales para este rubro: Instagram ${Math.round(digitalWeights.instagram * 100)}%, Facebook ${Math.round(digitalWeights.facebook * 100)}%, Web ${Math.round(digitalWeights.website * 100)}%`,
     `Resumen: ${attributes.summary}`,
   ]
     .filter(Boolean)

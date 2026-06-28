@@ -151,14 +151,22 @@ export default function DecisionsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      {company.score && !company.humanDecision && (
+                      {company.score && (
                         <>
                           <button onClick={() => handleDecision(company.id, "approved")}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-medium hover:bg-green-100">
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                              company.humanDecision === "approved" 
+                                ? "bg-green-200 text-green-800" 
+                                : "bg-green-50 text-green-600 hover:bg-green-100"
+                            }`}>
                             <Check size={12} /> Aprobar
                           </button>
                           <button onClick={() => handleDecision(company.id, "rejected")}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100">
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                              company.humanDecision === "rejected" 
+                                ? "bg-red-200 text-red-800" 
+                                : "bg-red-50 text-red-600 hover:bg-red-100"
+                            }`}>
                             <X size={12} /> Rechazar
                           </button>
                         </>

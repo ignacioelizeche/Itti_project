@@ -1,12 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { PrismaClient } from "@prisma/client";
-import { chatWithOllama } from "../services/ai/ollama-client.js";
+import { prisma } from "../lib/prisma.js";
+import { chatCompletion } from "../services/ai/llm-client.js";
 import { searchPlaces } from "../services/scraper/google-places.js";
 import { normalizeAndUpsert } from "../services/scraper/normalizer.js";
 import { enrichCompany } from "../services/enrichment.js";
+import { analyzeQueue } from "../services/ai/analysis-pipeline.js";
 import { ASUNCION_COORDS } from "../services/scraper/directories.js";
-
-const prisma = new PrismaClient();
+import { DiscoverSchema } from "../schemas/index.js";
 
 const QUERY_GENERATION_PROMPT = (description: string) => `Sos un experto en marketing y negocios en Paraguay. Generá exactamente 3 consultas de búsqueda para Google Places basándote en esta descripción de lo que busca el usuario.
 
@@ -24,18 +24,26 @@ Respondé SOLO con un JSON array de strings, sin nada más. Ejemplo:
 
 export async function discoverRoutes(fastify: FastifyInstance) {
   // POST /api/discover - Intelligent search from natural language
-  fastify.post<{
-    Body: { query: string; autoEnrich?: boolean };
-  }>("/", async (request, reply) => {
-    const { query, autoEnrich = true } = request.body;
-
-    if (!query || query.trim().length < 3) {
-      return reply.status(400).send({ error: "Query too short" });
+  fastify.post("/", {
+    schema: {
+      tags: ["Discover"],
+      summary: "Descubrir empresas con IA",
+      description: "Describe en lenguaje natural qué tipo de empresa buscás. La IA genera consultas de búsqueda, encuentra empresas, las guarda y las analiza automáticamente.",
+    },
+  }, async (request, reply) => {
+    const parseResult = DiscoverSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.issues[0].message });
     }
+
+    const { query, autoEnrich } = parseResult.data;
 
     try {
       // 1. Generate search queries with AI
-      const aiResponse = await chatWithOllama(QUERY_GENERATION_PROMPT(query));
+      const aiResponse = await chatCompletion([
+        { role: "system", content: "Sos un experto en marketing y negocios en Paraguay. Respondé SOLO con un JSON array de strings." },
+        { role: "user", content: QUERY_GENERATION_PROMPT(query) }
+      ], { temperature: 0.3 });
       
       // Extract JSON array from response
       const jsonMatch = aiResponse.match(/\[[\s\S]*?\]/);
@@ -88,7 +96,7 @@ export async function discoverRoutes(fastify: FastifyInstance) {
 
       console.log(`[Discover] Found ${allResults.length} unique results`);
 
-      // 3. Save to database and optionally enrich
+      // 3. Save to database, enrich, and queue for analysis
       const saved = [];
       for (const place of allResults) {
         try {
@@ -100,10 +108,17 @@ export async function discoverRoutes(fastify: FastifyInstance) {
           if (company) {
             saved.push({ ...company, isNew: result.isNew });
             
-            // Auto-enrich new companies if requested
+            // Auto-enrich and analyze new companies
             if (autoEnrich && result.isNew) {
               enrichCompany(result.id).catch((err) => {
                 console.error(`[Discover] Auto-enrich failed for ${place.name}:`, err);
+              });
+              // Queue for analysis
+              analyzeQueue.add(`analyze-${result.id}`, { companyId: result.id }, {
+                attempts: 2,
+                backoff: { type: "exponential", delay: 5000 },
+              }).catch((err) => {
+                console.error(`[Discover] Failed to queue analysis for ${place.name}:`, err);
               });
             }
           }

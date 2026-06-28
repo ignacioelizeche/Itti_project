@@ -243,7 +243,7 @@ export default function CompanyDetailPage() {
         {score !== null && (
           <div className="mt-4 flex items-center gap-3">
             <span className="text-sm text-gray-500">Decisión:</span>
-            {(company as any).humanDecision ? (
+            {(company as any).humanDecision && (
               <span className={`text-sm font-medium px-3 py-1 rounded-full ${
                 (company as any).humanDecision === "approved"
                   ? "bg-green-100 text-green-700"
@@ -251,30 +251,35 @@ export default function CompanyDetailPage() {
               }`}>
                 {(company as any).humanDecision === "approved" ? "✓ Aprobado" : "✗ Rechazado"}
               </span>
-            ) : (
-              <>
-                <button
-                  onClick={async () => {
-                    const res = await api.decide(id, "approved");
-                    setMessage(res.message);
-                    setCompany((prev) => prev ? { ...prev, humanDecision: "approved" } as any : prev);
-                  }}
-                  className="flex items-center gap-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600"
-                >
-                  <Check size={14} /> Aprobar
-                </button>
-                <button
-                  onClick={async () => {
-                    const res = await api.decide(id, "rejected");
-                    setMessage(res.message);
-                    setCompany((prev) => prev ? { ...prev, humanDecision: "rejected" } as any : prev);
-                  }}
-                  className="flex items-center gap-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"
-                >
-                  <X size={14} /> Rechazar
-                </button>
-              </>
             )}
+            <button
+              onClick={async () => {
+                const res = await api.decide(id, "approved");
+                setMessage(res.message);
+                setCompany((prev) => prev ? { ...prev, humanDecision: "approved" } as any : prev);
+              }}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium ${
+                (company as any).humanDecision === "approved"
+                  ? "bg-green-200 text-green-800"
+                  : "bg-green-500 text-white hover:bg-green-600"
+              }`}
+            >
+              <Check size={14} /> Aprobar
+            </button>
+            <button
+              onClick={async () => {
+                const res = await api.decide(id, "rejected");
+                setMessage(res.message);
+                setCompany((prev) => prev ? { ...prev, humanDecision: "rejected" } as any : prev);
+              }}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium ${
+                (company as any).humanDecision === "rejected"
+                  ? "bg-red-200 text-red-800"
+                  : "bg-red-500 text-white hover:bg-red-600"
+              }`}
+            >
+              <X size={14} /> Rechazar
+            </button>
           </div>
         )}
       </div>
@@ -505,12 +510,24 @@ export default function CompanyDetailPage() {
             <Facebook size={18} className="text-blue-600" />
             <h3 className="font-medium text-gray-900">Facebook</h3>
           </div>
-          {dataSources?.facebookData ? (
+          {dataSources?.facebookData?.followers ? (
             <div>
               <div className="text-2xl font-bold text-blue-600">
                 {formatNumber(dataSources.facebookData.followers)}
               </div>
               <div className="text-sm text-gray-500">seguidores</div>
+            </div>
+          ) : company.facebook ? (
+            <div>
+              <a
+                href={`https://facebook.com/${company.facebook}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+              >
+                {company.facebook} <ExternalLink size={12} />
+              </a>
+              <div className="text-xs text-gray-400 mt-1">Sin datos de tráfico</div>
             </div>
           ) : (
             <div className="text-sm text-gray-300">Sin datos</div>
@@ -523,15 +540,27 @@ export default function CompanyDetailPage() {
             <Globe size={18} className="text-green-600" />
             <h3 className="font-medium text-gray-900">Tráfico Web</h3>
           </div>
-          {dataSources?.webTraffic ? (
+          {dataSources?.webTraffic?.monthlyVisits ? (
             <div>
               <div className="text-2xl font-bold text-green-600">
                 {formatNumber(dataSources.webTraffic.monthlyVisits)}
               </div>
               <div className="text-sm text-gray-500">visitas/mes</div>
             </div>
+          ) : company.website ? (
+            <div>
+              <a
+                href={company.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-green-600 hover:underline flex items-center gap-1"
+              >
+                {company.website.replace(/^https?:\/\//, "").replace(/^www\./, "")} <ExternalLink size={12} />
+              </a>
+              <div className="text-xs text-gray-400 mt-1">Sin datos de tráfico</div>
+            </div>
           ) : (
-            <div className="text-sm text-gray-300">Sin datos</div>
+            <div className="text-sm text-gray-300">Sin sitio web</div>
           )}
         </div>
       </div>

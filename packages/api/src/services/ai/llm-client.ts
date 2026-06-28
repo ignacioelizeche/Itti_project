@@ -112,3 +112,21 @@ export async function chatCompletionJSON<T>(
     throw new Error(`Failed to parse JSON: ${cleaned.substring(0, 300)}`);
   }
 }
+
+export async function generateEmbedding(text: string): Promise<number[]> {
+  const response = await fetch(`${config.ollama.url}/api/embeddings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: config.ollama.embedModel,
+      prompt: text,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Ollama embedding error: ${response.status}`);
+  }
+
+  const data = (await response.json()) as { embedding: number[] };
+  return data.embedding;
+}

@@ -1,7 +1,5 @@
-import { generateEmbedding } from "./ollama-client.js";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { generateEmbedding } from "./llm-client.js";
+import { prisma } from "../../lib/prisma.js";
 
 function buildEmbeddingContent(company: {
   name: string;

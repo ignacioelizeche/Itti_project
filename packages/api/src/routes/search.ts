@@ -1,25 +1,23 @@
 import type { FastifyInstance } from "fastify";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma.js";
 import { semanticSearch, hybridSearch } from "../services/search/semantic.js";
-
-const prisma = new PrismaClient();
+import { SearchSchema, HybridSearchSchema } from "../schemas/index.js";
 
 export async function searchRoutes(fastify: FastifyInstance) {
   // POST /api/search - Semantic search
-  fastify.post<{
-    Body: {
-      query: string;
-      limit?: number;
-      category?: string;
-      minScore?: number;
-      city?: string;
-    };
-  }>("/", async (request, reply) => {
-    const { query, limit = 20, category, minScore, city } = request.body;
-
-    if (!query || query.trim().length === 0) {
-      return reply.status(400).send({ error: "Query is required" });
+  fastify.post("/", {
+    schema: {
+      tags: ["Search"],
+      summary: "Búsqueda semántica de empresas",
+      description: "Busca empresas usando embeddings y lenguaje natural",
+    },
+  }, async (request, reply) => {
+    const parseResult = SearchSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.issues[0].message });
     }
+
+    const { query, limit, category, minScore, city } = parseResult.data;
 
     try {
       const results = await semanticSearch(query, {
@@ -30,7 +28,6 @@ export async function searchRoutes(fastify: FastifyInstance) {
       });
 
       // Log the search
-      const prisma = fastify.prisma;
       await prisma.searchLog.create({
         data: {
           query,
@@ -51,21 +48,18 @@ export async function searchRoutes(fastify: FastifyInstance) {
   });
 
   // POST /api/search/hybrid - Hybrid search (semantic + filters)
-  fastify.post<{
-    Body: {
-      query: string;
-      limit?: number;
-      category?: string;
-      minScore?: number;
-      city?: string;
-      textFilter?: string;
-    };
-  }>("/hybrid", async (request, reply) => {
-    const { query, limit = 20, category, minScore, city, textFilter } = request.body;
-
-    if (!query || query.trim().length === 0) {
-      return reply.status(400).send({ error: "Query is required" });
+  fastify.post("/hybrid", {
+    schema: {
+      tags: ["Search"],
+      summary: "Búsqueda híbrida (semántica + filtros)",
+    },
+  }, async (request, reply) => {
+    const parseResult = HybridSearchSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({ error: parseResult.error.issues[0].message });
     }
+
+    const { query, limit, category, minScore, city, textFilter } = parseResult.data;
 
     try {
       const results = await hybridSearch(query, {

@@ -1,7 +1,5 @@
-import { generateEmbedding } from "../ai/ollama-client.js";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { generateEmbedding } from "../ai/llm-client.js";
+import { prisma } from "../../lib/prisma.js";
 
 interface SemanticSearchResult {
   companyId: number;
@@ -30,19 +28,39 @@ export async function semanticSearch(
 ): Promise<SemanticSearchResult[]> {
   const { limit = 20, category, minScore, city } = options;
 
-  // Generate embedding for the query (graceful fallback if Ollama unavailable)
   let queryEmbedding: number[];
   try {
     queryEmbedding = await generateEmbedding(query);
   } catch (error) {
     console.error("Embedding generation failed, falling back to text search:", error);
-    // Fallback: return empty results with a message
     return [];
   }
 
-  // Use raw SQL for vector similarity search with pgvector
-  const results = await prisma.$queryRawUnsafe<SemanticSearchResult[]>(
-    `
+  const conditions: string[] = ["ce.embedding IS NOT NULL"];
+  const params: unknown[] = [JSON.stringify(queryEmbedding)];
+  let paramIndex = 2;
+
+  if (category) {
+    conditions.push(`c.category = $${paramIndex}`);
+    params.push(category);
+    paramIndex++;
+  }
+
+  if (minScore) {
+    conditions.push(`cs.total_score >= $${paramIndex}`);
+    params.push(minScore);
+    paramIndex++;
+  }
+
+  if (city) {
+    conditions.push(`c.city = $${paramIndex}`);
+    params.push(city);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.join(" AND ");
+
+  const sql = `
     SELECT 
       c.id as "companyId",
       c.name,
@@ -61,15 +79,14 @@ export async function semanticSearch(
     LEFT JOIN "CompanyScore" cs ON cs.company_id = c.id
     LEFT JOIN "CompanyAnalysis" ca ON ca.company_id = c.id
     LEFT JOIN "CompanyEmbedding" ce ON ce.company_id = c.id
-    WHERE ce.embedding IS NOT NULL
-      ${category ? `AND c.category = '${category}'` : ""}
-      ${minScore ? `AND cs.total_score >= ${minScore}` : ""}
-      ${city ? `AND c.city = '${city}'` : ""}
+    WHERE ${whereClause}
     ORDER BY ce.embedding <=> $1::vector
-    LIMIT ${limit}
-    `,
-    JSON.stringify(queryEmbedding)
-  );
+    LIMIT $${paramIndex}
+  `;
+
+  params.push(limit);
+
+  const results = await prisma.$queryRawUnsafe<SemanticSearchResult[]>(sql, ...params);
 
   return results;
 }
@@ -94,9 +111,37 @@ export async function hybridSearch(
     return [];
   }
 
-  // Combine vector search with text filters
-  const results = await prisma.$queryRawUnsafe<SemanticSearchResult[]>(
-    `
+  const conditions: string[] = ["ce.embedding IS NOT NULL"];
+  const params: unknown[] = [JSON.stringify(queryEmbedding)];
+  let paramIndex = 2;
+
+  if (category) {
+    conditions.push(`c.category = $${paramIndex}`);
+    params.push(category);
+    paramIndex++;
+  }
+
+  if (minScore) {
+    conditions.push(`cs.total_score >= $${paramIndex}`);
+    params.push(minScore);
+    paramIndex++;
+  }
+
+  if (city) {
+    conditions.push(`c.city = $${paramIndex}`);
+    params.push(city);
+    paramIndex++;
+  }
+
+  if (textFilter) {
+    conditions.push(`(c.name ILIKE $${paramIndex} OR c.description ILIKE $${paramIndex})`);
+    params.push(`%${textFilter}%`);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.join(" AND ");
+
+  const sql = `
     SELECT 
       c.id as "companyId",
       c.name,
@@ -115,16 +160,14 @@ export async function hybridSearch(
     LEFT JOIN "CompanyScore" cs ON cs.company_id = c.id
     LEFT JOIN "CompanyAnalysis" ca ON ca.company_id = c.id
     LEFT JOIN "CompanyEmbedding" ce ON ce.company_id = c.id
-    WHERE ce.embedding IS NOT NULL
-      ${category ? `AND c.category = '${category}'` : ""}
-      ${minScore ? `AND cs.total_score >= ${minScore}` : ""}
-      ${city ? `AND c.city = '${city}'` : ""}
-      ${textFilter ? `AND (c.name ILIKE '%${textFilter}%' OR c.description ILIKE '%${textFilter}%')` : ""}
+    WHERE ${whereClause}
     ORDER BY ce.embedding <=> $1::vector
-    LIMIT ${limit}
-    `,
-    JSON.stringify(queryEmbedding)
-  );
+    LIMIT $${paramIndex}
+  `;
+
+  params.push(limit);
+
+  const results = await prisma.$queryRawUnsafe<SemanticSearchResult[]>(sql, ...params);
 
   return results;
 }

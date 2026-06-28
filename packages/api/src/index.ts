@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import prismaPlugin from "./plugins/prisma.js";
 import corsPlugin from "./plugins/cors.js";
 import redisPlugin from "./plugins/redis.js";
+import { swaggerPlugin } from "./plugins/swagger.js";
 import { scrapeRoutes } from "./routes/scrape.js";
 import { scoreRoutes } from "./routes/scores.js";
 import { searchRoutes } from "./routes/search.js";
@@ -26,6 +27,8 @@ async function bootstrap() {
   console.log("CORS plugin registered");
   await fastify.register(redisPlugin);
   console.log("Redis plugin registered");
+  await fastify.register(swaggerPlugin);
+  console.log("Swagger plugin registered");
 
   // Routes
   await fastify.register(scrapeRoutes, { prefix: "/api/scrape" });

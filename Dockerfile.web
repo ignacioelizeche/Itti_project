@@ -1,0 +1,18 @@
+FROM node:20-slim AS base
+
+WORKDIR /app
+
+# Install dependencies only
+COPY package.json package-lock.json ./
+COPY packages/web/package.json ./packages/web/
+RUN npm ci
+
+# Copy source code
+COPY packages/web ./packages/web
+
+# Build
+RUN npm run build --workspace=packages/web
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start", "--workspace=packages/web"]
