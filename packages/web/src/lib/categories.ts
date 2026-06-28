@@ -1,0 +1,16 @@
+export const CATEGORIES = [
+  "Gastronomía",
+  "Moda",
+  "Deportes",
+  "Supermercados",
+  "Bienestar",
+  "Educación",
+  "Tecnología",
+  "Entretenimiento",
+  "Hoteles",
+  "Combustibles",
+  "Farmacias",
+  "Automotor",
+  "Joyas",
+  "Ópticas",
+] as const;

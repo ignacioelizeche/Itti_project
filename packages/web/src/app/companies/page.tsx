@@ -2,25 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api, type CompanyWithScore } from "@/lib/api";
+import { CATEGORIES } from "@/lib/categories";
 import { CompanyCard } from "@/components/companies/CompanyCard";
 import { Building2 } from "lucide-react";
-
-const CATEGORIES = [
-  "Gastronomía",
-  "Moda",
-  "Deportes",
-  "Supermercados",
-  "Bienestar",
-  "Educación",
-  "Tecnología",
-  "Entretenimiento",
-  "Hoteles",
-  "Combustibles",
-  "Farmacias",
-  "Automotor",
-  "Joyas",
-  "Ópticas",
-];
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<CompanyWithScore[]>([]);

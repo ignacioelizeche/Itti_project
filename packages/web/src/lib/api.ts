@@ -149,4 +149,13 @@ export const api = {
     }),
 
   getScrapeJobs: () => fetchAPI<{ jobs: ScrapeJob[] }>("/scrape/jobs"),
+
+  getCompany: (id: number) =>
+    fetchAPI<any>(`/scores/company/${id}`),
+
+  updateCompany: (id: number, data: Record<string, string>) =>
+    fetchAPI<{ message: string; company: any }>(`/scores/company/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 };

@@ -3,13 +3,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type SearchResult } from "@/lib/api";
+import { CATEGORIES } from "@/lib/categories";
 import { CompanyCard } from "@/components/companies/CompanyCard";
 import { Search } from "lucide-react";
-
-const CATEGORIES = [
-  "Gastronomía", "Moda", "Deportes", "Supermercados", "Bienestar",
-  "Educación", "Tecnología", "Entretenimiento", "Hoteles", "Combustibles", "Farmacias",
-];
 
 export default function SearchContent() {
   const searchParams = useSearchParams();

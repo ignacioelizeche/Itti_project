@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api, type CompanyWithScore, type Analysis } from "@/lib/api";
+import type { EnrichedData } from "@/types";
 import { ScoreBadge } from "@/components/scoring/ScoreBadge";
 import { ScoreRadar } from "@/components/scoring/ScoreRadar";
 import { ScoreBreakdown } from "@/components/scoring/ScoreBreakdown";
@@ -23,33 +24,6 @@ import {
   Check,
 } from "lucide-react";
 import Link from "next/link";
-
-interface EnrichedData {
-  instagram?: {
-    fullName: string;
-    biography: string;
-    followersCount: number;
-    postsCount: number;
-    isBusinessAccount: boolean;
-    isVerified: boolean;
-    avgLikes: number;
-    avgComments: number;
-    engagementRate: number;
-    scrapedAt: string;
-  };
-  webTraffic?: {
-    monthlyVisits: number;
-    bounceRate: number;
-    pagesPerVisit: number;
-    rank: number;
-  };
-  facebookData?: {
-    followers: number;
-    likes: number;
-    rating: number;
-    reviewCount: number;
-  };
-}
 
 export default function CompanyDetailPage() {
   const params = useParams();
@@ -72,8 +46,7 @@ export default function CompanyDetailPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch(`/api/scores/company/${id}`)
-      .then((res) => res.json())
+    api.getCompany(id)
       .then((data) => {
         setCompany(data);
         setEditData({
@@ -91,34 +64,24 @@ export default function CompanyDetailPage() {
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/scores/company/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editData),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(data.message || "Datos actualizados");
-        setEditing(false);
-        setCompany((prev) =>
-          prev
-            ? {
-                ...prev,
-                website: data.company.website,
-                instagram: data.company.instagram,
-                facebook: data.company.facebook,
-              }
-            : prev
-        );
-        // If enrichment was triggered, refresh data after a delay
-        if (data.message?.includes("Enriqueciendo")) {
-          setTimeout(async () => {
-            const updated = await fetch(`/api/scores/company/${id}`).then((r) => r.json());
-            setCompany(updated);
-          }, 5000);
-        }
-      } else {
-        setMessage(data.error || "Error al guardar");
+      const data = await api.updateCompany(id, editData);
+      setMessage(data.message || "Datos actualizados");
+      setEditing(false);
+      setCompany((prev) =>
+        prev
+          ? {
+              ...prev,
+              website: data.company.website,
+              instagram: data.company.instagram,
+              facebook: data.company.facebook,
+            }
+          : prev
+      );
+      if (data.message?.includes("Enriqueciendo")) {
+        setTimeout(async () => {
+          const updated = await api.getCompany(id);
+          setCompany(updated);
+        }, 5000);
       }
     } catch (err) {
       setMessage("Error al guardar");
@@ -136,7 +99,7 @@ export default function CompanyDetailPage() {
       // Poll for results
       const poll = setInterval(async () => {
         try {
-          const updated = await fetch(`/api/scores/company/${id}`).then((r) => r.json());
+          const updated = await api.getCompany(id);
           if (updated.score) {
             setCompany(updated);
             setMessage("Análisis completado");

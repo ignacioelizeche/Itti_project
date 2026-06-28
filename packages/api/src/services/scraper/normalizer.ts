@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { slugify } from "../../utils/rate-limiter.js";
+import { slugify } from "../../utils/slug.js";
 
 interface RawCompanyData {
   name: string;

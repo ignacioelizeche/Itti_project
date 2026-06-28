@@ -3,20 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import type { CompanyDecision } from "@/types";
 import { RefreshCw, Search, ExternalLink, Check, X } from "lucide-react";
-
-interface CompanyDecision {
-  id: number;
-  name: string;
-  category: string;
-  website: string | null;
-  instagramFollowers: number | null;
-  score: number | null;
-  scoreLabel: string | null;
-  humanDecision: string | null;
-  humanNote: string | null;
-  decidedAt: string | null;
-}
 
 export default function DecisionsPage() {
   const [companies, setCompanies] = useState<CompanyDecision[]>([]);

@@ -1,17 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { api } from "@/lib/api";
+import type { DiscoveredCompany } from "@/types";
 import { Search, Sparkles, Star, MapPin, ExternalLink, Plus, Check } from "lucide-react";
-
-interface DiscoveredCompany {
-  id: number;
-  name: string;
-  category: string;
-  address: string;
-  googleRating: number | null;
-  score: number | null;
-  isNew: boolean;
-}
 
 export default function DiscoverPage() {
   const [query, setQuery] = useState("");
@@ -29,19 +21,7 @@ export default function DiscoverPage() {
     setMessage("Generando consultas de búsqueda con IA...");
 
     try {
-      const res = await fetch("/api/discover", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim(), autoEnrich: true }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setMessage(data.error || "Error al buscar");
-        return;
-      }
-
+      const data = await api.discover(query.trim(), true);
       setGeneratedQueries(data.generatedQueries);
       setResults(data.companies);
       setMessage(`Encontré ${data.totalFound} empresas. ${data.newCompanies} nuevas se están enriqueciendo automáticamente.`);

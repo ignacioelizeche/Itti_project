@@ -1,8 +1,7 @@
 import { prisma } from "../lib/prisma.js";
-import { scrapeInstagramViaApify } from "./scraper/instagram-apify.js";
-import { extractInstagramUsername } from "./scraper/instagram.js";
-import { scrapeSimilarWeb, extractDomain } from "./scraper/similarweb.js";
-import { scrapeFacebookByName, extractFacebookUrl } from "./scraper/facebook.js";
+import { enrichInstagram } from "./enrichment/instagram.js";
+import { enrichWebsite } from "./enrichment/website.js";
+import { enrichFacebook } from "./enrichment/facebook.js";
 
 export interface EnrichmentResult {
   companyId: number;
@@ -46,127 +45,53 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
   };
   const dbUpdate: Record<string, any> = {};
 
-  // 1. Instagram scraping via Apify
   try {
-    const igUsername = await extractInstagramUsername(
-      company.website || undefined,
-      company.instagram || undefined
-    );
-
-    if (igUsername) {
-      const igData = await scrapeInstagramViaApify(igUsername);
-      if (igData) {
-        const avgLikes =
-          igData.recentPosts.length > 0
-            ? igData.recentPosts.reduce((s, p) => s + p.likesCount, 0) /
-              igData.recentPosts.length
-            : 0;
-        const avgComments =
-          igData.recentPosts.length > 0
-            ? igData.recentPosts.reduce((s, p) => s + p.commentsCount, 0) /
-              igData.recentPosts.length
-            : 0;
-        const engagementRate =
-          igData.followersCount > 0
-            ? Math.round(
-                ((avgLikes + avgComments) / igData.followersCount) * 10000
-              ) / 100
-            : 0;
-
-        result.instagram = {
-          scraped: true,
-          followers: igData.followersCount,
-          engagementRate,
-        };
-
-        dbUpdate.instagram = igUsername;
-        dbUpdate.instagramFollowers = igData.followersCount;
-        dataSourcesUpdate.instagram = {
-          fullName: igData.fullName,
-          biography: igData.biography,
-          followersCount: igData.followersCount,
-          postsCount: igData.postsCount,
-          isBusinessAccount: igData.isBusinessAccount,
-          isVerified: igData.isVerified,
-          avgLikes: Math.round(avgLikes),
-          avgComments: Math.round(avgComments),
-          engagementRate,
-          scrapedAt: new Date().toISOString(),
-        };
-      }
+    const ig = await enrichInstagram(company.name, company.website, company.instagram);
+    if (ig) {
+      result.instagram = {
+        scraped: true,
+        followers: ig.followers,
+        engagementRate: ig.engagementRate,
+      };
+      dbUpdate.instagram = ig.username;
+      dbUpdate.instagramFollowers = ig.followers;
+      dataSourcesUpdate.instagram = ig.dataSources;
     }
   } catch (error) {
     console.error(`Instagram enrichment failed for ${company.name}:`, error);
   }
 
-  // 2. Website scraping - title, description, e-shop, contact, quality score
   try {
     if (company.website) {
-      const domain = extractDomain(company.website);
-      const webData = await scrapeSimilarWeb(domain);
-      if (webData) {
+      const web = await enrichWebsite(company.website);
+      if (web) {
         result.webTraffic = {
           scraped: true,
-          monthlyVisits: webData.monthlyVisits,
-          bounceRate: webData.bounceRate,
+          monthlyVisits: web.monthlyVisits,
+          bounceRate: web.bounceRate,
         };
-
-        dataSourcesUpdate.similarweb = {
-          monthlyVisits: webData.monthlyVisits,
-          bounceRate: webData.bounceRate,
-          pagesPerVisit: webData.pagesPerVisit,
-          rank: webData.rank,
-          source: webData.source,
-          title: webData.title || "",
-          description: webData.description || "",
-          hasEshop: webData.hasEshop || false,
-          hasContact: webData.hasContact || false,
-          hasWhatsApp: webData.hasWhatsApp || false,
-          socialLinks: webData.socialLinks || [],
-          qualityScore: webData.qualityScore || 0,
-        };
+        dataSourcesUpdate.similarweb = web.dataSources;
       }
     }
   } catch (error) {
     console.error(`Website scraping failed for ${company.name}:`, error);
   }
 
-  // 3. Facebook scraping via Apify
   try {
-    const fbUsername = company.facebook
-      || extractFacebookUrl(company.website || "")
-      || extractFacebookUrl(company.description || "");
-
-    if (fbUsername) {
-      dbUpdate.facebook = fbUsername;
-
-      const fbData = await scrapeFacebookByName(company.name, fbUsername);
-      if (fbData) {
-        result.facebook = {
-          scraped: true,
-          followers: fbData.followers,
-          rating: 0,
-        };
-
-        dataSourcesUpdate.facebook = {
-          name: fbData.name,
-          followers: fbData.followers,
-          likes: fbData.likes,
-          rating: fbData.rating,
-          category: fbData.category,
-          phone: fbData.phone,
-          email: fbData.email,
-          website: fbData.website,
-          address: fbData.address,
-          scrapedAt: new Date().toISOString(),
-        };
-      }
+    const fb = await enrichFacebook(company.name, company.facebook, company.website, company.description);
+    if (fb) {
+      result.facebook = {
+        scraped: true,
+        followers: fb.followers,
+        rating: 0,
+      };
+      dbUpdate.facebook = fb.username;
+      dataSourcesUpdate.facebook = fb.dataSources;
     }
   } catch (error) {
     console.error(`Facebook enrichment failed for ${company.name}:`, error);
   }
 
-  // Single DB update with all accumulated data
   dbUpdate.dataSources = dataSourcesUpdate;
   dbUpdate.lastScrapedAt = new Date();
 
@@ -193,7 +118,6 @@ export async function enrichBatch(limit: number = 10): Promise<number> {
     try {
       await enrichCompany(company.id);
       enriched++;
-      // Rate limiting: 1 second between companies
       await new Promise((r) => setTimeout(r, 1000));
     } catch (error) {
       console.error(`Failed to enrich ${company.name}:`, error);

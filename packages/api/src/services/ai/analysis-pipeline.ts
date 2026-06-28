@@ -1,4 +1,4 @@
-import { Queue, Worker, Job } from "bullmq";
+import { Queue } from "bullmq";
 import { prisma } from "../../lib/prisma.js";
 import { extractCompanyAttributes } from "./analyzer.js";
 import { calculateAffinityScore } from "./scorer.js";
@@ -10,11 +10,6 @@ import { getQueueConnection } from "../../lib/queue.js";
 const connectionConfig = getQueueConnection();
 
 export const analyzeQueue = new Queue("analyze", { connection: connectionConfig });
-
-interface AnalyzeJobData {
-  companyId: number;
-  force?: boolean;
-}
 
 const JUSTIFICATION_PROMPT = `Eres un analista de alianzas comerciales de Ueno Bank (banco digital paraguayo).
 
@@ -28,7 +23,28 @@ El párrafo debe:
 
 Sé directo y profesional. Usa datos concretos cuando estén disponibles.`;
 
-async function analyzeCompany(companyId: number): Promise<void> {
+function buildStrengths(attrs: { digitalStrength: string; localReputation: string; hasPromotions: boolean; acceptsCards: boolean }): string {
+  return [
+    attrs.digitalStrength === "high" ? "Fuerte presencia digital" : null,
+    attrs.localReputation === "high" ? "Buena reputación local" : null,
+    attrs.hasPromotions ? "Ya tiene promociones activas" : null,
+    attrs.acceptsCards ? "Acepta tarjetas de crédito" : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+function buildWeaknesses(attrs: { digitalStrength: string; localReputation: string; physicalPresence: boolean }): string {
+  return [
+    attrs.digitalStrength === "low" ? "Débil presencia digital" : null,
+    attrs.localReputation === "low" ? "Reputación baja o desconocida" : null,
+    !attrs.physicalPresence ? "Sin presencia física" : null,
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+export async function analyzeCompany(companyId: number): Promise<void> {
   let company = await prisma.company.findUnique({
     where: { id: companyId },
     include: { score: true, analysis: true },
@@ -38,24 +54,20 @@ async function analyzeCompany(companyId: number): Promise<void> {
 
   console.log(`[AnalyzeWorker] Analyzing: ${company.name}`);
 
-  // Step 0: Enrich first if not yet enriched (auto-enrichment)
   if (!company.instagramFollowers && !company.lastScrapedAt) {
     console.log(`[AnalyzeWorker] Auto-enriching ${company.name} before analysis...`);
     try {
       await enrichCompany(companyId);
-      // Reload company with enriched data
       const reloaded = await prisma.company.findUnique({
         where: { id: companyId },
         include: { score: true, analysis: true },
       });
       if (reloaded) company = reloaded;
-      console.log(`[AnalyzeWorker] Enrichment completed for ${company.name}`);
     } catch (err) {
       console.warn(`[AnalyzeWorker] Enrichment failed for ${company.name}, continuing with analysis`);
     }
   }
 
-  // Step 1: Extract attributes
   const attributes = await extractCompanyAttributes(company.name, {
     category: company.category ?? undefined,
     subcategory: company.subcategory ?? undefined,
@@ -72,9 +84,6 @@ async function analyzeCompany(companyId: number): Promise<void> {
     dataSources: (company.dataSources as Record<string, unknown>) ?? undefined,
   });
 
-  console.log(`[AnalyzeWorker] Attributes extracted for: ${company.name}`);
-
-  // Step 2: Calculate affinity score
   const scoreResult = await calculateAffinityScore(
     company.name,
     attributes,
@@ -90,9 +99,6 @@ async function analyzeCompany(companyId: number): Promise<void> {
     }
   );
 
-  console.log(`[AnalyzeWorker] Score calculated for ${company.name}: ${scoreResult.totalScore}/100`);
-
-  // Step 3: Generate justification
   const justificationMessages = [
     { role: "system" as const, content: JUSTIFICATION_PROMPT },
     {
@@ -118,131 +124,43 @@ Genera el párrafo de justificación.`,
     maxTokens: 512,
   });
 
-  console.log(`[AnalyzeWorker] Justification generated for: ${company.name}`);
+  const scoreFields = {
+    categoryFit: scoreResult.scores.categoryFit,
+    locationFit: scoreResult.scores.locationFit,
+    audienceOverlap: scoreResult.scores.audienceOverlap,
+    businessSize: scoreResult.scores.businessSize,
+    digitalPresence: scoreResult.scores.digitalPresence,
+    reputation: scoreResult.scores.reputation,
+    ittiCompatibility: scoreResult.scores.ittiCompatibility,
+    alliancePotential: scoreResult.scores.alliancePotential,
+    totalScore: scoreResult.totalScore,
+    scoreLabel: scoreResult.scoreLabel,
+  };
 
-  // Step 4: Save score
   await prisma.companyScore.upsert({
     where: { companyId },
-    create: {
-      companyId,
-      categoryFit: scoreResult.scores.categoryFit,
-      locationFit: scoreResult.scores.locationFit,
-      audienceOverlap: scoreResult.scores.audienceOverlap,
-      businessSize: scoreResult.scores.businessSize,
-      digitalPresence: scoreResult.scores.digitalPresence,
-      reputation: scoreResult.scores.reputation,
-      ittiCompatibility: scoreResult.scores.ittiCompatibility,
-      alliancePotential: scoreResult.scores.alliancePotential,
-      totalScore: scoreResult.totalScore,
-      scoreLabel: scoreResult.scoreLabel,
-    },
-    update: {
-      categoryFit: scoreResult.scores.categoryFit,
-      locationFit: scoreResult.scores.locationFit,
-      audienceOverlap: scoreResult.scores.audienceOverlap,
-      businessSize: scoreResult.scores.businessSize,
-      digitalPresence: scoreResult.scores.digitalPresence,
-      reputation: scoreResult.scores.reputation,
-      ittiCompatibility: scoreResult.scores.ittiCompatibility,
-      alliancePotential: scoreResult.scores.alliancePotential,
-      totalScore: scoreResult.totalScore,
-      scoreLabel: scoreResult.scoreLabel,
-      calculatedAt: new Date(),
-    },
+    create: { companyId, ...scoreFields },
+    update: { ...scoreFields, calculatedAt: new Date() },
   });
 
-  // Step 5: Save analysis
+  const analysisFields = {
+    summary: attributes.summary,
+    strengths: buildStrengths(attributes),
+    weaknesses: buildWeaknesses(attributes),
+    recommendation: justification,
+    fullAnalysis: justification,
+    modelUsed: "llama3.1:8b (Ollama local)",
+  };
+
   await prisma.companyAnalysis.upsert({
     where: { companyId },
-    create: {
-      companyId,
-      summary: attributes.summary,
-      strengths: [
-        attributes.digitalStrength === "high" ? "Fuerte presencia digital" : null,
-        attributes.localReputation === "high" ? "Buena reputación local" : null,
-        attributes.hasPromotions ? "Ya tiene promociones activas" : null,
-        attributes.acceptsCards ? "Acepta tarjetas de crédito" : null,
-      ]
-        .filter(Boolean)
-        .join("; "),
-      weaknesses: [
-        attributes.digitalStrength === "low" ? "Débil presencia digital" : null,
-        attributes.localReputation === "low" ? "Reputación baja o desconocida" : null,
-        !attributes.physicalPresence ? "Sin presencia física" : null,
-      ]
-        .filter(Boolean)
-        .join("; "),
-      recommendation: justification,
-      fullAnalysis: justification,
-      modelUsed: "llama3.1:8b (Ollama local)",
-    },
-    update: {
-      summary: attributes.summary,
-      strengths: [
-        attributes.digitalStrength === "high" ? "Fuerte presencia digital" : null,
-        attributes.localReputation === "high" ? "Buena reputación local" : null,
-        attributes.hasPromotions ? "Ya tiene promociones activas" : null,
-        attributes.acceptsCards ? "Acepta tarjetas de crédito" : null,
-      ]
-        .filter(Boolean)
-        .join("; "),
-      weaknesses: [
-        attributes.digitalStrength === "low" ? "Débil presencia digital" : null,
-        attributes.localReputation === "low" ? "Reputación baja o desconocida" : null,
-        !attributes.physicalPresence ? "Sin presencia física" : null,
-      ]
-        .filter(Boolean)
-        .join("; "),
-      recommendation: justification,
-      fullAnalysis: justification,
-      modelUsed: "llama3.1:8b (Ollama local)",
-      createdAt: new Date(),
-    },
+    create: { companyId, ...analysisFields },
+    update: { ...analysisFields, createdAt: new Date() },
   });
 
-  // Step 6: Generate embedding (optional, can fail silently)
   try {
     await generateAndStoreEmbedding(companyId);
-    console.log(`[AnalyzeWorker] Embedding generated for: ${company.name}`);
-  } catch (error) {
+  } catch {
     console.warn(`[AnalyzeWorker] Embedding skipped for ${company.name} (Ollama may not be running)`);
   }
 }
-
-// Worker
-const analyzeWorker = new Worker(
-  "analyze",
-  async (job: Job<AnalyzeJobData>) => {
-    const { companyId, force } = job.data;
-
-    // Check if already analyzed (unless forced)
-    if (!force) {
-      const existing = await prisma.companyScore.findUnique({
-        where: { companyId },
-      });
-      if (existing) {
-        console.log(`[AnalyzeWorker] Company ${companyId} already analyzed, skipping`);
-        return { skipped: true };
-      }
-    }
-
-    await analyzeCompany(companyId);
-    // Delay between jobs to respect 30 RPM limit (3 calls per company)
-    await new Promise((r) => setTimeout(r, 6500));
-    return { success: true };
-  },
-  {
-    connection: connectionConfig,
-    concurrency: 1,
-  }
-);
-
-analyzeWorker.on("completed", (job) => {
-  console.log(`[AnalyzeWorker] Job ${job.id} completed for company ${job.data.companyId}`);
-});
-
-analyzeWorker.on("failed", (job, err) => {
-  console.error(`[AnalyzeWorker] Job ${job?.id} failed:`, err.message);
-});
-
-export { analyzeWorker };
