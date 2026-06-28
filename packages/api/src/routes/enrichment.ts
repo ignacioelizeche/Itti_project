@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { Queue } from "bullmq";
+import { prisma } from "../lib/prisma.js";
 import { getQueueConnection } from "../lib/queue.js";
 
 const enrichmentQueue = new Queue("enrichment", {
@@ -12,7 +13,6 @@ export async function enrichmentRoutes(fastify: FastifyInstance) {
     Querystring: { limit?: string; enriched?: string };
   }>("/companies", async (request) => {
     const { limit = "50", enriched } = request.query;
-    const prisma = fastify.prisma;
 
     const where: any = {};
     if (enriched === "true") {

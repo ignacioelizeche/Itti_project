@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type ScrapeJob } from "@/lib/api";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Play, RefreshCw, CheckCircle, XCircle, Clock } from "lucide-react";
 
 export default function ScrapePage() {
@@ -95,9 +96,7 @@ export default function ScrapePage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin w-8 h-8 border-4 border-ueno-blue border-t-transparent rounded-full" />
-          </div>
+          <LoadingSpinner className="h-32" />
         ) : jobs.length > 0 ? (
           <div className="space-y-2">
             {jobs.map((job) => (

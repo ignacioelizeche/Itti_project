@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
+import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 import { chatCompletion } from "../services/ai/llm-client.js";
 import { searchPlaces } from "../services/scraper/google-places.js";
 import { normalizeAndUpsert } from "../services/scraper/normalizer.js";
 import { enrichCompany } from "../services/enrichment.js";
 import { analyzeQueue } from "../services/ai/analysis-pipeline.js";
-import { ASUNCION_COORDS } from "../services/scraper/directories.js";
+import { ASUNCION_COORDS } from "../utils/consts.js";
 import { DiscoverSchema } from "../schemas/index.js";
 import { validateOrReply } from "../lib/validate.js";
 
@@ -64,9 +65,9 @@ export async function discoverRoutes(fastify: FastifyInstance) {
             locationBias: {
               latitude: ASUNCION_COORDS.latitude,
               longitude: ASUNCION_COORDS.longitude,
-              radius: 15000,
+              radius: config.scraper.googlePlacesRadius,
             },
-            maxResults: 20,
+            maxResults: config.scraper.googlePlacesMaxResults,
             languageCode: "es",
           });
 
@@ -114,8 +115,8 @@ export async function discoverRoutes(fastify: FastifyInstance) {
               });
               // Queue for analysis
               analyzeQueue.add(`analyze-${result.id}`, { companyId: result.id }, {
-                attempts: 2,
-                backoff: { type: "exponential", delay: 5000 },
+                attempts: config.workers.discoverAttempts,
+                backoff: { type: "exponential", delay: config.workers.discoverBackoffDelay },
               }).catch((err) => {
                 console.error(`[Discover] Failed to queue analysis for ${place.name}:`, err);
               });

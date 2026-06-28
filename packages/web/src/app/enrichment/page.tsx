@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import type { CompanyDecision } from "@/types";
 import { RefreshCw, Search, ExternalLink, Check, X } from "lucide-react";
 
@@ -89,9 +90,7 @@ export default function DecisionsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin w-8 h-8 border-4 border-ueno-blue border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner className="h-64" />
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <table className="w-full">

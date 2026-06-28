@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type Stats } from "@/lib/api";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Play, RefreshCw } from "lucide-react";
 
 export default function ScoringPage() {
@@ -42,11 +43,7 @@ export default function ScoringPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-8 h-8 border-4 border-ueno-blue border-t-transparent rounded-full" />
-      </div>
-    );
+    return <LoadingSpinner className="h-64" />;
   }
 
   return (

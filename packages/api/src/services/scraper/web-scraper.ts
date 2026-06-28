@@ -1,6 +1,10 @@
 import * as cheerio from "cheerio";
+import { config } from "../../config.js";
 import { RateLimiter } from "../../utils/rate-limiter.js";
 import { BROWSER_USER_AGENT } from "../../utils/consts.js";
+import { extractSocialLinks } from "../../utils/social.js";
+
+const limiter = new RateLimiter(config.scraper.directoryRateLimitMs);
 
 interface WebData {
   description?: string;
@@ -15,8 +19,6 @@ interface WebData {
   emails: string[];
   phoneNumbers: string[];
 }
-
-const limiter = new RateLimiter(2000);
 
 export async function scrapeWebsite(url: string): Promise<WebData | null> {
   try {
@@ -44,25 +46,11 @@ export async function scrapeWebsite(url: string): Promise<WebData | null> {
       undefined;
 
     // Extract social links
-    const socialLinks: WebData["socialLinks"] = {};
-    const socialPatterns: Record<string, RegExp> = {
-      instagram: /instagram\.com\/([^/?#]+)/,
-      facebook: /facebook\.com\/([^/?#]+)/,
-      twitter: /(?:twitter|x)\.com\/([^/?#]+)/,
-      tiktok: /tiktok\.com\/@([^/?#]+)/,
-    };
-
-    $('a[href*="instagram.com"], a[href*="facebook.com"], a[href*="twitter.com"], a[href*="x.com"], a[href*="tiktok.com"]').each(
-      (_, el) => {
-        const href = $(el).attr("href") || "";
-        for (const [platform, pattern] of Object.entries(socialPatterns)) {
-          const match = href.match(pattern);
-          if (match) {
-            socialLinks[platform as keyof typeof socialLinks] = match[1];
-          }
-        }
-      }
-    );
+    const allLinks = $('a[href*="instagram.com"], a[href*="facebook.com"], a[href*="twitter.com"], a[href*="x.com"], a[href*="tiktok.com"]')
+      .map((_, el) => $(el).attr("href") || "")
+      .get()
+      .join(" ");
+    const socialLinks = extractSocialLinks(allLinks);
 
     // Extract emails
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import Fastify from "fastify";
-import prismaPlugin from "../plugins/prisma.js";
 import corsPlugin from "../plugins/cors.js";
 import redisPlugin from "../plugins/redis.js";
 import { scoreRoutes } from "../routes/scores.js";
@@ -12,7 +11,6 @@ let app: Awaited<ReturnType<typeof Fastify>>;
 
 beforeAll(async () => {
   app = Fastify({ logger: false });
-  await app.register(prismaPlugin);
   await app.register(corsPlugin);
   await app.register(redisPlugin);
   await app.register(scrapeRoutes, { prefix: "/api/scrape" });

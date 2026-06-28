@@ -11,14 +11,14 @@ async function sleep(ms: number) {
 
 async function ollamaRequestWithRetry<T>(
   fn: () => Promise<T>,
-  maxRetries = 3
+  maxRetries = config.ollama.maxRetries
 ): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error: any) {
       if (attempt < maxRetries - 1) {
-        const waitMs = 3000 + attempt * 5000;
+        const waitMs = config.ollama.retryBaseDelay + attempt * 5000;
         console.log(`[LLM] Error: ${error.message?.substring(0, 100)}, retrying in ${waitMs}ms (${attempt + 1}/${maxRetries})`);
         await sleep(waitMs);
         continue;
@@ -53,7 +53,7 @@ export async function chatCompletion(
 
   const response = await ollamaRequestWithRetry(async () => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+    const timeout = setTimeout(() => controller.abort(), config.ollama.timeout);
 
     try {
       const res = await fetch(`${config.ollama.url}/api/generate`, {

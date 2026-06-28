@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma.js";
 import { enrichCompany } from "../../services/enrichment.js";
 import { CompanyUpdateSchema } from "../../schemas/index.js";
 import { validateOrReply } from "../../lib/validate.js";
+import { cleanInstagram, cleanFacebook } from "../../utils/social.js";
 
 export async function companyRoutes(fastify: FastifyInstance) {
   // GET /api/scores/company/:companyId - Get company with all data
@@ -62,21 +63,8 @@ export async function companyRoutes(fastify: FastifyInstance) {
 
     const updateData: Record<string, any> = {};
     if (website !== undefined) updateData.website = website || null;
-    if (instagram !== undefined && instagram) {
-      const cleanIg = instagram
-        .replace(/^https?:\/\/(www\.)?instagram\.com\//, "")
-        .replace("@", "")
-        .split("/")[0]
-        .trim();
-      updateData.instagram = cleanIg || null;
-    }
-    if (facebook !== undefined && facebook) {
-      const cleanFb = facebook
-        .replace(/^https?:\/\/(www\.)?facebook\.com\//, "")
-        .split("?")[0]
-        .trim();
-      updateData.facebook = cleanFb || null;
-    }
+    if (instagram !== undefined) updateData.instagram = cleanInstagram(instagram) ?? null;
+    if (facebook !== undefined) updateData.facebook = cleanFacebook(facebook) ?? null;
     if (phone !== undefined) updateData.phone = phone || null;
 
     const updated = await prisma.company.update({

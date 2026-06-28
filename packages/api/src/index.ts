@@ -1,7 +1,5 @@
 import Fastify from "fastify";
-import { Worker } from "bullmq";
 import { config } from "./config.js";
-import prismaPlugin from "./plugins/prisma.js";
 import corsPlugin from "./plugins/cors.js";
 import redisPlugin from "./plugins/redis.js";
 import { swaggerPlugin } from "./plugins/swagger.js";
@@ -10,8 +8,7 @@ import { scoreRoutes } from "./routes/scores.js";
 import { searchRoutes } from "./routes/search.js";
 import { enrichmentRoutes } from "./routes/enrichment.js";
 import { discoverRoutes } from "./routes/discover.js";
-import { enrichCompany, enrichBatch } from "./services/enrichment.js";
-import { getQueueConnection } from "./lib/queue.js";
+import { enrichmentWorker } from "./workers/enrichment-worker.js";
 
 const fastify = Fastify({
   logger: {
@@ -22,8 +19,6 @@ const fastify = Fastify({
 async function bootstrap() {
   console.log("Starting server...");
   // Plugins
-  await fastify.register(prismaPlugin);
-  console.log("Prisma plugin registered");
   await fastify.register(corsPlugin);
   console.log("CORS plugin registered");
   await fastify.register(redisPlugin);
@@ -42,31 +37,6 @@ async function bootstrap() {
   // Health check
   fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
-  });
-
-  // Start enrichment worker in-process (non-blocking)
-  const enrichmentWorker = new Worker(
-    "enrichment",
-    async (job) => {
-      const { companyId, batch, limit } = job.data;
-      if (batch) {
-        const enriched = await enrichBatch(limit || 10);
-        return { enriched, type: "batch" };
-      }
-      if (companyId) {
-        const result = await enrichCompany(companyId);
-        return { result, type: "single" };
-      }
-      return { error: "No companyId or batch flag provided" };
-    },
-    { connection: getQueueConnection(), concurrency: 1 }
-  );
-
-  enrichmentWorker.on("completed", (job) => {
-    console.log(`Enrichment job ${job.id} completed`);
-  });
-  enrichmentWorker.on("failed", (job, error) => {
-    console.error(`Enrichment job ${job?.id} failed:`, error.message);
   });
 
   // Graceful shutdown

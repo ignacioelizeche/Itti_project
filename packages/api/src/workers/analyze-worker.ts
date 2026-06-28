@@ -1,4 +1,5 @@
 import { Worker, Job } from "bullmq";
+import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 import { getQueueConnection } from "../lib/queue.js";
 import { analyzeCompany } from "../services/ai/analysis-pipeline.js";
@@ -24,12 +25,12 @@ const analyzeWorker = new Worker(
     }
 
     await analyzeCompany(companyId);
-    await new Promise((r) => setTimeout(r, 6500));
+    await new Promise((r) => setTimeout(r, config.workers.analyzeDelayMs));
     return { success: true };
   },
   {
     connection: getQueueConnection(),
-    concurrency: 1,
+    concurrency: config.workers.concurrency,
   }
 );
 

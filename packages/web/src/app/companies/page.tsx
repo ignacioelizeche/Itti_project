@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, type CompanyWithScore } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
 import { CompanyCard } from "@/components/companies/CompanyCard";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Building2 } from "lucide-react";
 
 export default function CompaniesPage() {
@@ -53,9 +54,7 @@ export default function CompaniesPage() {
 
       {/* Companies Grid */}
       {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="animate-spin w-8 h-8 border-4 border-ueno-blue border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner className="h-32" />
       ) : companies.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (

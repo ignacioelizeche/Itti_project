@@ -2,6 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import https from "https";
 import { BROWSER_USER_AGENT } from "../../utils/consts.js";
+import { extractSocialLinks } from "../../utils/social.js";
 
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
@@ -75,21 +76,14 @@ export async function scrapeSimilarWeb(domain: string): Promise<WebTrafficData |
       const hasWhatsApp =
         /wa\.me|api\.whatsapp\.com|whatsapp/i.test(html);
 
-      const socialLinks: string[] = [];
-      $('a[href*="instagram.com"]').each((_, el) => {
-        const href = $(el).attr("href");
-        if (href && !socialLinks.includes("instagram")) socialLinks.push("instagram");
-      });
-      $('a[href*="facebook.com"]').each((_, el) => {
-        const href = $(el).attr("href");
-        if (href && !socialLinks.includes("facebook")) socialLinks.push("facebook");
-      });
-      $('a[href*="tiktok.com"]').each((_, el) => {
-        if (!socialLinks.includes("tiktok")) socialLinks.push("tiktok");
-      });
-      $('a[href*="twitter.com"], a[href*="x.com"]').each((_, el) => {
-        if (!socialLinks.includes("twitter")) socialLinks.push("twitter");
-      });
+      const allLinks = $('a[href*="instagram.com"], a[href*="facebook.com"], a[href*="tiktok.com"], a[href*="twitter.com"], a[href*="x.com"]')
+        .map((_, el) => $(el).attr("href") || "")
+        .get()
+        .join(" ");
+      const found = extractSocialLinks(allLinks);
+      const socialLinks: string[] = Object.entries(found)
+        .filter(([, v]) => v)
+        .map(([k]) => k);
 
       const links = $("a[href]").length;
       const images = $("img").length;

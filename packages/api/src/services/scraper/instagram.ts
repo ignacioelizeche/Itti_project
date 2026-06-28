@@ -1,13 +1,11 @@
+import { cleanInstagram, extractInstagramFromHtml } from "../../utils/social.js";
+
 export async function extractInstagramUsername(
   website?: string,
   instagram?: string
 ): Promise<string | null> {
-  // If Instagram username is already provided
-  if (instagram) {
-    return instagram.replace("@", "").replace(/https?:\/\/(www\.)?instagram\.com\//, "").split("/")[0];
-  }
+  if (instagram) return cleanInstagram(instagram);
 
-  // Try to find Instagram link from website
   if (website) {
     try {
       const response = await fetch(website, {
@@ -19,8 +17,7 @@ export async function extractInstagramUsername(
 
       if (response.ok) {
         const html = await response.text();
-        const instagramMatch = html.match(/instagram\.com\/([a-zA-Z0-9_.]+)/);
-        if (instagramMatch) return instagramMatch[1];
+        return extractInstagramFromHtml(html);
       }
     } catch {
       // Ignore errors

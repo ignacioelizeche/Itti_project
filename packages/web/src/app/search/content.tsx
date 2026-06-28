@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { api, type SearchResult } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
 import { CompanyCard } from "@/components/companies/CompanyCard";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Search } from "lucide-react";
 
 export default function SearchContent() {
@@ -67,9 +68,7 @@ export default function SearchContent() {
       </form>
 
       {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="animate-spin w-8 h-8 border-4 border-ueno-blue border-t-transparent rounded-full" />
-        </div>
+        <LoadingSpinner className="h-32" />
       ) : results.length > 0 ? (
         <div className="space-y-4">
           <p className="text-sm text-gray-500">{results.length} resultados encontrados</p>

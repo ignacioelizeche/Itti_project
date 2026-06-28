@@ -1,6 +1,8 @@
 import { config } from "../../config.js";
 import { RateLimiter } from "../../utils/rate-limiter.js";
 
+const limiter = new RateLimiter(config.scraper.googlePlacesRateLimitMs);
+
 interface PlaceResult {
   name: string;
   address: string;
@@ -22,14 +24,12 @@ interface PlaceSearchOptions {
   languageCode?: string;
 }
 
-const limiter = new RateLimiter(500);
-
 export async function searchPlaces(options: PlaceSearchOptions): Promise<PlaceResult[]> {
-  const { query, locationBias, maxResults = 20, languageCode = "es" } = options;
+  const { query, locationBias, maxResults = config.scraper.googlePlacesMaxResults, languageCode = "es" } = options;
 
   const body: Record<string, unknown> = {
     textQuery: query,
-    maxResultCount: Math.min(maxResults, 20),
+    maxResultCount: Math.min(maxResults, config.scraper.googlePlacesMaxResults),
     languageCode,
   };
 

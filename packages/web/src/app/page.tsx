@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { api, type Stats, type CompanyWithScore } from "@/lib/api";
 import { ScoreBadge } from "@/components/scoring/ScoreBadge";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { KPICard } from "@/components/ui/KPICard";
 import {
   Building2,
   TrendingUp,
@@ -26,11 +28,7 @@ export default function Dashboard() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-8 h-8 border-4 border-ueno-blue border-t-transparent rounded-full" />
-      </div>
-    );
+    return <LoadingSpinner className="h-64" />;
   }
 
   return (
@@ -39,31 +37,10 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard
-          icon={<Building2 size={20} />}
-          label="Total Empresas"
-          value={stats?.total || 0}
-          color="bg-blue-500"
-        />
-        <KPICard
-          icon={<TrendingUp size={20} />}
-          label="Analizadas"
-          value={stats?.analyzed || 0}
-          color="bg-green-500"
-        />
-        <KPICard
-          icon={<BarChart3 size={20} />}
-          label="Score Promedio"
-          value={stats?.averageScore || 0}
-          suffix="/100"
-          color="bg-purple-500"
-        />
-        <KPICard
-          icon={<Users size={20} />}
-          label="Pendientes"
-          value={stats?.notAnalyzed || 0}
-          color="bg-yellow-500"
-        />
+        <KPICard icon={<Building2 size={20} />} label="Total Empresas" value={stats?.total || 0} color="bg-blue-500" />
+        <KPICard icon={<TrendingUp size={20} />} label="Analizadas" value={stats?.analyzed || 0} color="bg-green-500" />
+        <KPICard icon={<BarChart3 size={20} />} label="Score Promedio" value={stats?.averageScore || 0} suffix="/100" color="bg-purple-500" />
+        <KPICard icon={<Users size={20} />} label="Pendientes" value={stats?.notAnalyzed || 0} color="bg-yellow-500" />
       </div>
 
       {/* Score Distribution */}
@@ -117,33 +94,4 @@ export default function Dashboard() {
   );
 }
 
-function KPICard({
-  icon,
-  label,
-  value,
-  suffix = "",
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  suffix?: string;
-  color: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-      <div className="flex items-center gap-3">
-        <div className={`${color} text-white p-2 rounded-lg`}>{icon}</div>
-        <div>
-          <div className="text-2xl font-bold text-gray-900">
-            {Math.round(value)}
-            {suffix && (
-              <span className="text-sm font-normal text-gray-400">{suffix}</span>
-            )}
-          </div>
-          <div className="text-sm text-gray-500">{label}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
+

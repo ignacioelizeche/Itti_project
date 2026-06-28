@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { config } from "../../config.js";
 import { prisma } from "../../lib/prisma.js";
 import { analyzeQueue } from "../../services/ai/analysis-pipeline.js";
 import { AnalyzeSchema } from "../../schemas/index.js";
@@ -46,8 +47,8 @@ export async function analysisRoutes(fastify: FastifyInstance) {
       `analyze-${companyId}`,
       { companyId: parseInt(companyId), force },
       {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 30000 },
+        attempts: config.workers.analyzeAttempts,
+        backoff: { type: "exponential", delay: config.workers.analyzeBackoffDelay },
       }
     );
 
@@ -87,8 +88,8 @@ export async function analysisRoutes(fastify: FastifyInstance) {
         `analyze-${company.id}`,
         { companyId: company.id, force },
         {
-          attempts: 3,
-          backoff: { type: "exponential", delay: 30000 },
+          attempts: config.workers.analyzeAttempts,
+          backoff: { type: "exponential", delay: config.workers.analyzeBackoffDelay },
         }
       );
       queued++;

@@ -1,7 +1,9 @@
 import { Queue, Worker, Job } from "bullmq";
+import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 import { searchPlaces } from "../services/scraper/google-places.js";
-import { scrapePaginasAmarillas, scrapeGuiaCommercial, ASUNCION_COORDS } from "../services/scraper/directories.js";
+import { scrapePaginasAmarillas, scrapeGuiaCommercial } from "../services/scraper/directories.js";
+import { ASUNCION_COORDS } from "../utils/consts.js";
 import { scrapeWebsite } from "../services/scraper/web-scraper.js";
 import { normalizeBatch } from "../services/scraper/normalizer.js";
 import { enrichCompany } from "../services/enrichment.js";
@@ -59,9 +61,9 @@ const scrapeWorker = new Worker(
             locationBias: {
               latitude: ASUNCION_COORDS.latitude,
               longitude: ASUNCION_COORDS.longitude,
-              radius: 15000, // 15km radius
+              radius: config.scraper.googlePlacesRadius,
             },
-            maxResults: 20,
+            maxResults: config.scraper.googlePlacesMaxResults,
             languageCode: "es",
           });
 
@@ -176,8 +178,8 @@ const scrapeWorker = new Worker(
             });
             // Queue for analysis
             analyzeQueue.add(`analyze-${company.id}`, { companyId: company.id }, {
-              attempts: 2,
-              backoff: { type: "exponential", delay: 5000 },
+              attempts: config.workers.scrapeAttempts,
+              backoff: { type: "exponential", delay: config.workers.scrapeBackoffDelay },
             }).catch((err) => {
               console.error(`[ScrapeWorker] Failed to queue analysis for ${company.name}:`, err);
             });
@@ -222,7 +224,7 @@ const scrapeWorker = new Worker(
   },
   {
     connection: connectionConfig,
-    concurrency: 1, // One job at a time to avoid rate limits
+    concurrency: config.workers.concurrency,
   }
 );
 

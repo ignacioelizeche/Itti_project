@@ -1,4 +1,5 @@
 import { ApifyClient } from "apify-client";
+import { cleanFacebook, extractFacebookFromHtml } from "../../utils/social.js";
 
 export interface FacebookData {
   pageId: string;
@@ -69,23 +70,4 @@ export async function scrapeFacebookByName(
   return results.length > 0 ? results[0] : null;
 }
 
-export function extractFacebookUrl(text: string): string | null {
-  const match = text.match(/facebook\.com\/([a-zA-Z0-9.]+)(?:\/|\?|$)/);
-  if (!match) return null;
-  const page = match[1];
-  if (
-    [
-      "profile.php",
-      "pages",
-      "login",
-      "signup",
-      "recover",
-      "help",
-      "policies",
-      "groups",
-    ].includes(page)
-  ) {
-    return null;
-  }
-  return page;
-}
+export { extractFacebookFromHtml as extractFacebookUrl, cleanFacebook };

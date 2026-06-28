@@ -7,6 +7,7 @@ import type { EnrichedData } from "@/types";
 import { ScoreBadge } from "@/components/scoring/ScoreBadge";
 import { ScoreRadar } from "@/components/scoring/ScoreRadar";
 import { ScoreBreakdown } from "@/components/scoring/ScoreBreakdown";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { formatNumber } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -117,11 +118,7 @@ export default function CompanyDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin w-8 h-8 border-4 border-ueno-blue border-t-transparent rounded-full" />
-      </div>
-    );
+    return <LoadingSpinner className="h-64" />;
   }
 
   if (!company) {

@@ -1,6 +1,9 @@
 import * as cheerio from "cheerio";
+import { config } from "../../config.js";
 import { RateLimiter } from "../../utils/rate-limiter.js";
 import { BROWSER_USER_AGENT } from "../../utils/consts.js";
+
+const limiter = new RateLimiter(config.scraper.directoryRateLimitMs);
 
 interface DirectoryResult {
   name: string;
@@ -10,13 +13,6 @@ interface DirectoryResult {
   website?: string;
   source: string;
 }
-
-const limiter = new RateLimiter(2000);
-
-const ASUNCION_COORDS = {
-  latitude: -25.2637,
-  longitude: -57.5759,
-};
 
 export async function scrapePaginasAmarillas(
   category: string,
@@ -111,4 +107,4 @@ export async function scrapeGuiaCommercial(
   return results;
 }
 
-export { ASUNCION_COORDS };
+
