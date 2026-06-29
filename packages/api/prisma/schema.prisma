@@ -37,9 +37,12 @@ model Company {
   decidedAt          DateTime? @map("decided_at")
   lastScrapedAt      DateTime? @map("last_scraped_at")
   dataSources        Json?     @map("data_sources")
+  parentId           Int?      @map("parent_id")
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
+  parent    Company?  @relation("CompanyBranches", fields: [parentId], references: [id])
+  branches  Company[] @relation("CompanyBranches")
   score     CompanyScore?
   analysis  CompanyAnalysis?
   embedding CompanyEmbedding?

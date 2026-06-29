@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { config } from "../../config.js";
+import { logger } from "../../lib/logger.js";
 import { RateLimiter } from "../../utils/rate-limiter.js";
 import { BROWSER_USER_AGENT } from "../../utils/consts.js";
 import { extractSocialLinks } from "../../utils/social.js";
@@ -22,6 +23,24 @@ interface WebData {
 
 export async function scrapeWebsite(url: string): Promise<WebData | null> {
   try {
+    // Validate URL scheme and block SSRF to private/internal IPs
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return null;
+    }
+    const hostname = parsed.hostname;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^169\.254\./.test(hostname)
+    ) {
+      return null;
+    }
+
     await limiter.wait();
 
     const response = await fetch(url, {
@@ -78,7 +97,7 @@ export async function scrapeWebsite(url: string): Promise<WebData | null> {
       phoneNumbers: phoneNumbers.slice(0, 3),
     };
   } catch (error) {
-    console.error(`Error scraping website ${url}:`, error);
+    logger.error(error, `Error scraping website ${url}`);
     return null;
   }
 }

@@ -1,5 +1,6 @@
 import { Worker, Job } from "bullmq";
 import { config } from "../config.js";
+import { logger } from "../lib/logger.js";
 import { getQueueConnection } from "../lib/queue.js";
 import { enrichCompany, enrichBatch } from "../services/enrichment.js";
 
@@ -21,11 +22,11 @@ const enrichmentWorker = new Worker(
 );
 
 enrichmentWorker.on("completed", (job) => {
-  console.log(`Enrichment job ${job.id} completed`);
+  logger.info(`Enrichment job ${job.id} completed`);
 });
 
 enrichmentWorker.on("failed", (job, error) => {
-  console.error(`Enrichment job ${job?.id} failed:`, error.message);
+  logger.error(error, `Enrichment job ${job?.id} failed`);
 });
 
 export { enrichmentWorker };

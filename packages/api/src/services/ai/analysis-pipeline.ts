@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { prisma } from "../../lib/prisma.js";
+import { logger } from "../../lib/logger.js";
 import { extractCompanyAttributes } from "./analyzer.js";
 import { calculateAffinityScore } from "./scorer.js";
 import { generateAndStoreEmbedding } from "./embeddings.js";
@@ -52,10 +53,10 @@ export async function analyzeCompany(companyId: number): Promise<void> {
 
   if (!company) throw new Error(`Company ${companyId} not found`);
 
-  console.log(`[AnalyzeWorker] Analyzing: ${company.name}`);
+  logger.info(`[AnalyzeWorker] Analyzing: ${company.name}`);
 
   if (!company.instagramFollowers && !company.lastScrapedAt) {
-    console.log(`[AnalyzeWorker] Auto-enriching ${company.name} before analysis...`);
+    logger.info(`[AnalyzeWorker] Auto-enriching ${company.name} before analysis...`);
     try {
       await enrichCompany(companyId);
       const reloaded = await prisma.company.findUnique({
@@ -64,7 +65,7 @@ export async function analyzeCompany(companyId: number): Promise<void> {
       });
       if (reloaded) company = reloaded;
     } catch (err) {
-      console.warn(`[AnalyzeWorker] Enrichment failed for ${company.name}, continuing with analysis`);
+      logger.warn(`[AnalyzeWorker] Enrichment failed for ${company.name}, continuing with analysis`);
     }
   }
 
@@ -137,12 +138,6 @@ Genera el párrafo de justificación.`,
     scoreLabel: scoreResult.scoreLabel,
   };
 
-  await prisma.companyScore.upsert({
-    where: { companyId },
-    create: { companyId, ...scoreFields },
-    update: { ...scoreFields, calculatedAt: new Date() },
-  });
-
   const analysisFields = {
     summary: attributes.summary,
     strengths: buildStrengths(attributes),
@@ -152,15 +147,22 @@ Genera el párrafo de justificación.`,
     modelUsed: "llama3.1:8b (Ollama local)",
   };
 
-  await prisma.companyAnalysis.upsert({
-    where: { companyId },
-    create: { companyId, ...analysisFields },
-    update: { ...analysisFields, createdAt: new Date() },
-  });
+  await prisma.$transaction([
+    prisma.companyScore.upsert({
+      where: { companyId },
+      create: { companyId, ...scoreFields },
+      update: { ...scoreFields, calculatedAt: new Date() },
+    }),
+    prisma.companyAnalysis.upsert({
+      where: { companyId },
+      create: { companyId, ...analysisFields },
+      update: { ...analysisFields, createdAt: new Date() },
+    }),
+  ]);
 
   try {
     await generateAndStoreEmbedding(companyId);
   } catch {
-    console.warn(`[AnalyzeWorker] Embedding skipped for ${company.name} (Ollama may not be running)`);
+    logger.warn(`[AnalyzeWorker] Embedding skipped for ${company.name} (Ollama may not be running)`);
   }
 }

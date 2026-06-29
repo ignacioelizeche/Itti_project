@@ -8,12 +8,15 @@ import { Play, RefreshCw } from "lucide-react";
 export default function ScoringPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
-  const [fullFlowRunning, setFullFlowRunning] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    api.getStats().then(setStats).catch(console.error).finally(() => setLoading(false));
+    api.getStats()
+      .then(setStats)
+      .catch(() => setError("Error al cargar estadísticas."))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleAnalyzeAll = async () => {
@@ -29,21 +32,17 @@ export default function ScoringPage() {
     }
   };
 
-  const handleFullFlow = async () => {
-    setFullFlowRunning(true);
-    setMessage("");
-    try {
-      const res = await api.fullFlowBatch(undefined, 200, true);
-      setMessage(res.message + ". " + res.note);
-    } catch {
-      setMessage("Error al iniciar pipeline completo");
-    } finally {
-      setFullFlowRunning(false);
-    }
-  };
-
   if (loading) {
     return <LoadingSpinner className="h-64" />;
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-gray-900">Scoring IA</h1>
+        <div className="p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>
+      </div>
+    );
   }
 
   return (
@@ -69,20 +68,13 @@ export default function ScoringPage() {
         <h2 className="text-lg font-semibold mb-4">Acciones</h2>
         <div className="flex gap-4">
           <button
-            onClick={handleFullFlow}
-            disabled={fullFlowRunning || analyzing}
-            className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
-          >
-            {fullFlowRunning ? <RefreshCw size={18} className="animate-spin" /> : <Play size={18} />}
-            {fullFlowRunning ? "Procesando..." : "Pipeline Completo (Enriquecer + Analizar)"}
-          </button>
-          <button
             onClick={handleAnalyzeAll}
-            disabled={analyzing || fullFlowRunning}
+            disabled={analyzing}
+            aria-label="Analizar empresas pendientes"
             className="flex items-center gap-2 bg-ueno-blue text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
           >
             {analyzing ? <RefreshCw size={18} className="animate-spin" /> : <Play size={18} />}
-            {analyzing ? "Analizando..." : "Solo Analizar"}
+            {analyzing ? "Analizando..." : "Analizar Pendientes"}
           </button>
         </div>
         {message && (

@@ -1,5 +1,6 @@
 import { generateEmbedding } from "../ai/llm-client.js";
 import { prisma } from "../../lib/prisma.js";
+import { logger } from "../../lib/logger.js";
 
 interface SemanticSearchResult {
   companyId: number;
@@ -33,7 +34,7 @@ export async function semanticSearch(
   try {
     queryEmbedding = await generateEmbedding(query);
   } catch (error) {
-    console.error("Embedding generation failed, falling back to text search:", error);
+    logger.error(error, "Embedding generation failed, falling back to text search");
     return [];
   }
 

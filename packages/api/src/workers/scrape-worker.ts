@@ -1,6 +1,7 @@
 import { Queue, Worker, Job } from "bullmq";
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
+import { logger } from "../lib/logger.js";
 import { searchPlaces } from "../services/scraper/google-places.js";
 import { scrapePaginasAmarillas, scrapeGuiaCommercial } from "../services/scraper/directories.js";
 import { ASUNCION_COORDS } from "../utils/consts.js";
@@ -27,7 +28,7 @@ const scrapeWorker = new Worker(
   async (job: Job<ScrapeJobData>) => {
     const { source, category, jobId } = job.data;
 
-    console.log(`[ScrapeWorker] Processing ${source} for "${category}" (job ${jobId})`);
+    logger.info(`[ScrapeWorker] Processing ${source} for "${category}" (job ${jobId})`);
 
     // Mark job as active
     await prisma.scrapeJob.update({
@@ -162,7 +163,7 @@ const scrapeWorker = new Worker(
 
         // Auto-enrich new companies (fire and forget)
         if (newCompanies > 0) {
-          console.log(`[ScrapeWorker] Auto-enriching ${newCompanies} new companies...`);
+          logger.info(`[ScrapeWorker] Auto-enriching ${newCompanies} new companies...`);
           // Get recently created companies that need enrichment
           const recentCompanies = await prisma.company.findMany({
             where: {
@@ -174,14 +175,14 @@ const scrapeWorker = new Worker(
           });
           for (const company of recentCompanies) {
             enrichCompany(company.id).catch((err) => {
-              console.error(`[ScrapeWorker] Auto-enrich failed for ${company.name}:`, err);
+              logger.error(err, `[ScrapeWorker] Auto-enrich failed for ${company.name}`);
             });
             // Queue for analysis
             analyzeQueue.add(`analyze-${company.id}`, { companyId: company.id }, {
               attempts: config.workers.scrapeAttempts,
               backoff: { type: "exponential", delay: config.workers.scrapeBackoffDelay },
             }).catch((err) => {
-              console.error(`[ScrapeWorker] Failed to queue analysis for ${company.name}:`, err);
+              logger.error(err, `[ScrapeWorker] Failed to queue analysis for ${company.name}`);
             });
           }
         }
@@ -199,14 +200,14 @@ const scrapeWorker = new Worker(
         },
       });
 
-      console.log(
+      logger.info(
         `[ScrapeWorker] Completed: ${totalFound} found, ${newCompanies} new`
       );
 
       return { totalFound, newCompanies, errors: errors.length };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      console.error(`[ScrapeWorker] Error:`, errorMsg);
+      logger.error(error, `[ScrapeWorker] Error`);
 
       await prisma.scrapeJob.update({
         where: { id: jobId },
@@ -229,11 +230,11 @@ const scrapeWorker = new Worker(
 );
 
 scrapeWorker.on("completed", (job) => {
-  console.log(`[ScrapeWorker] Job ${job.id} completed`);
+  logger.info(`[ScrapeWorker] Job ${job.id} completed`);
 });
 
 scrapeWorker.on("failed", (job, err) => {
-  console.error(`[ScrapeWorker] Job ${job?.id} failed:`, err.message);
+  logger.error(err, `[ScrapeWorker] Job ${job?.id} failed`);
 });
 
 export { scrapeWorker };

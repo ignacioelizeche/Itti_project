@@ -5,7 +5,11 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text();
+    const msg = (() => { try { return JSON.parse(body).error || body; } catch { return body; } })();
+    throw new Error(`API ${res.status}: ${msg || res.statusText}`);
+  }
   return res.json();
 }
 
@@ -28,6 +32,23 @@ export interface Company {
   allianceStatus: string | null;
   allianceDetails: { benefit?: string; type?: string } | null;
   dataSources?: Record<string, any>;
+  parentId?: number | null;
+}
+
+export interface ChainRef {
+  id: number;
+  name: string;
+  slug?: string;
+  category?: string | null;
+}
+
+export interface BranchRef {
+  id: number;
+  name: string;
+  slug?: string;
+  address?: string | null;
+  category?: string | null;
+  city?: string | null;
 }
 
 export interface Score {
@@ -113,12 +134,6 @@ export const api = {
       body: JSON.stringify({ category, limit }),
     }),
 
-  fullFlowBatch: (category?: string, limit = 50, force = false) =>
-    fetchAPI<{ message: string; note: string }>("/scores/full-flow", {
-      method: "POST",
-      body: JSON.stringify({ category, limit, force }),
-    }),
-
   decide: (companyId: number, decision: "approved" | "rejected", note?: string) =>
     fetchAPI<{ message: string; company: { id: number; humanDecision: string | null } }>(
       `/scores/decide/${companyId}`,
@@ -151,7 +166,29 @@ export const api = {
   getScrapeJobs: () => fetchAPI<{ jobs: ScrapeJob[] }>("/scrape/jobs"),
 
   getCompany: (id: number) =>
-    fetchAPI<any>(`/scores/company/${id}`),
+    fetchAPI<CompanyWithScore & {
+      analysis?: Analysis;
+      dataSources?: Record<string, any>;
+      parent?: ChainRef;
+      branches?: BranchRef[];
+    }>(`/scores/company/${id}`),
+
+  getChainSuggestions: (id: number) =>
+    fetchAPI<{ suggestions: (BranchRef & { similarity?: number })[]; type: string }>(
+      `/scores/company/${id}/suggestions`
+    ),
+
+  linkCompany: (companyId: number, targetId: number) =>
+    fetchAPI<{ message: string }>(`/scores/company/${companyId}/link`, {
+      method: "POST",
+      body: JSON.stringify({ action: "link", targetId }),
+    }),
+
+  unlinkCompany: (companyId: number, targetId: number) =>
+    fetchAPI<{ message: string }>(`/scores/company/${companyId}/link`, {
+      method: "POST",
+      body: JSON.stringify({ action: "unlink", targetId }),
+    }),
 
   updateCompany: (id: number, data: Record<string, string>) =>
     fetchAPI<{ message: string; company: any }>(`/scores/company/${id}`, {

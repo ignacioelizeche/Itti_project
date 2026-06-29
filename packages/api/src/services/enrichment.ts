@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { logger } from "../lib/logger.js";
 import { enrichInstagram } from "./enrichment/instagram.js";
 import { enrichWebsite } from "./enrichment/website.js";
 import { enrichFacebook } from "./enrichment/facebook.js";
@@ -30,7 +31,7 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
 
   if (!company) return null;
 
-  console.log(` enriching: ${company.name}`);
+  logger.info(`Enriching: ${company.name}`);
 
   const result: EnrichmentResult = {
     companyId,
@@ -58,7 +59,7 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
       dataSourcesUpdate.instagram = ig.dataSources;
     }
   } catch (error) {
-    console.error(`Instagram enrichment failed for ${company.name}:`, error);
+    logger.error(error, `Instagram enrichment failed for ${company.name}`);
   }
 
   try {
@@ -74,7 +75,7 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
       }
     }
   } catch (error) {
-    console.error(`Website scraping failed for ${company.name}:`, error);
+    logger.error(error, `Website scraping failed for ${company.name}`);
   }
 
   try {
@@ -89,7 +90,7 @@ export async function enrichCompany(companyId: number): Promise<EnrichmentResult
       dataSourcesUpdate.facebook = fb.dataSources;
     }
   } catch (error) {
-    console.error(`Facebook enrichment failed for ${company.name}:`, error);
+    logger.error(error, `Facebook enrichment failed for ${company.name}`);
   }
 
   dbUpdate.dataSources = dataSourcesUpdate;
@@ -120,7 +121,7 @@ export async function enrichBatch(limit: number = 10): Promise<number> {
       enriched++;
       await new Promise((r) => setTimeout(r, 1000));
     } catch (error) {
-      console.error(`Failed to enrich ${company.name}:`, error);
+      logger.error(error, `Failed to enrich ${company.name}`);
     }
   }
 

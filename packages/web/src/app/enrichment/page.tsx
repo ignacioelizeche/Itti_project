@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -13,6 +13,7 @@ export default function DecisionsPage() {
   const [filter, setFilter] = useState<"all" | "pending" | "decided">("pending");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => { fetchDecisions(); }, [filter]);
 
@@ -22,7 +23,7 @@ export default function DecisionsPage() {
       const res = await api.getDecisions(filter === "all" ? "" : filter);
       setCompanies(res.companies);
     } catch (err) {
-      console.error(err);
+      setError("Error al cargar decisiones.");
     } finally {
       setLoading(false);
     }
@@ -38,10 +39,10 @@ export default function DecisionsPage() {
     }
   };
 
-  const filtered = companies.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
-  const pendingCount = companies.filter((c) => !c.humanDecision).length;
-  const decidedCount = companies.filter((c) => c.humanDecision).length;
-  const approvedCount = companies.filter((c) => c.humanDecision === "approved").length;
+  const filtered = useMemo(() => companies.filter((c) => c.name.toLowerCase().includes(search.toLowerCase())), [companies, search]);
+  const pendingCount = useMemo(() => companies.filter((c) => !c.humanDecision).length, [companies]);
+  const decidedCount = useMemo(() => companies.filter((c) => c.humanDecision).length, [companies]);
+  const approvedCount = useMemo(() => companies.filter((c) => c.humanDecision === "approved").length, [companies]);
 
   return (
     <div className="space-y-6">
@@ -71,6 +72,7 @@ export default function DecisionsPage() {
           <div className="flex gap-2">
             {(["all", "pending", "decided"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)}
+                aria-pressed={filter === f}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f ? "bg-ueno-blue text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
                 {f === "all" ? "Todas" : f === "pending" ? "Pendientes" : "Decididas"}
               </button>
@@ -79,6 +81,7 @@ export default function DecisionsPage() {
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="Buscar empresa..." value={search} onChange={(e) => setSearch(e.target.value)}
+              aria-label="Buscar empresa"
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm" />
           </div>
           <button onClick={fetchDecisions}
@@ -87,6 +90,7 @@ export default function DecisionsPage() {
           </button>
         </div>
         {message && <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-lg text-sm">{message}</div>}
+        {error && <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
       </div>
 
       {loading ? (

@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { config } from "../../config.js";
+import { logger } from "../../lib/logger.js";
 import { RateLimiter } from "../../utils/rate-limiter.js";
 import { BROWSER_USER_AGENT } from "../../utils/consts.js";
 
@@ -55,7 +56,7 @@ export async function scrapePaginasAmarillas(
       }
     });
   } catch (error) {
-    console.error(`Error scraping Paginas Amarillas for "${category}":`, error);
+    logger.error(error, `Error scraping Paginas Amarillas for "${category}"`);
   }
 
   return results;
@@ -101,7 +102,7 @@ export async function scrapeGuiaCommercial(
       }
     });
   } catch (error) {
-    console.error(`Error scraping Guía Commercial for "${category}":`, error);
+    logger.error(error, `Error scraping Guía Commercial for "${category}"`);
   }
 
   return results;

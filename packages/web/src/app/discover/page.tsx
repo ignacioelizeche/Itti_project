@@ -61,6 +61,7 @@ export default function DiscoverPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              aria-label="Describir empresa a descubrir"
               className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-ueno-blue focus:border-transparent"
             />
           </div>
@@ -125,7 +126,7 @@ export default function DiscoverPage() {
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">Resultados ({results.length})</h2>
           </div>
-          <table className="w-full">
+          <table className="w-full" aria-label="Resultados del descubrimiento">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Empresa</th>

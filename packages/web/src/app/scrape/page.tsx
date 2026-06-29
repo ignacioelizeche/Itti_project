@@ -9,13 +9,15 @@ export default function ScrapePage() {
   const [jobs, setJobs] = useState<ScrapeJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
+  const [error, setError] = useState("");
 
   const loadJobs = () => {
     setLoading(true);
+    setError("");
     api
       .getScrapeJobs()
       .then((res) => setJobs(res.jobs))
-      .catch(console.error)
+      .catch(() => setError("Error al cargar jobs."))
       .finally(() => setLoading(false));
   };
 
@@ -29,7 +31,7 @@ export default function ScrapePage() {
       await api.triggerScrape(source);
       setTimeout(loadJobs, 2000);
     } catch (err) {
-      console.error(err);
+      setError("Error al iniciar recolección.");
     } finally {
       setTriggering(false);
     }
@@ -94,6 +96,10 @@ export default function ScrapePage() {
             Actualizar
           </button>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
+        )}
 
         {loading ? (
           <LoadingSpinner className="h-32" />

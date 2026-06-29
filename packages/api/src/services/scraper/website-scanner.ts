@@ -1,10 +1,7 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
-import https from "https";
 import { BROWSER_USER_AGENT } from "../../utils/consts.js";
 import { extractSocialLinks } from "../../utils/social.js";
-
-const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 export interface WebTrafficData {
   domain: string;
@@ -53,7 +50,6 @@ export async function scrapeSimilarWeb(domain: string): Promise<WebTrafficData |
         },
         timeout: 8000,
         maxRedirects: 5,
-        httpsAgent,
       });
 
       if (response.status !== 200) continue;

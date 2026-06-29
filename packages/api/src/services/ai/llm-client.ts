@@ -1,4 +1,5 @@
 import { config } from "../../config.js";
+import { logger } from "../../lib/logger.js";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -19,7 +20,7 @@ async function ollamaRequestWithRetry<T>(
     } catch (error: any) {
       if (attempt < maxRetries - 1) {
         const waitMs = config.ollama.retryBaseDelay + attempt * 5000;
-        console.log(`[LLM] Error: ${error.message?.substring(0, 100)}, retrying in ${waitMs}ms (${attempt + 1}/${maxRetries})`);
+        logger.info(`[LLM] Error: ${error.message?.substring(0, 100)}, retrying in ${waitMs}ms (${attempt + 1}/${maxRetries})`);
         await sleep(waitMs);
         continue;
       }

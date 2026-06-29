@@ -1,5 +1,6 @@
 import { ApifyClient } from "apify-client";
 import { cleanFacebook, extractFacebookFromHtml } from "../../utils/social.js";
+import { config } from "../../config.js";
 
 export interface FacebookData {
   pageId: string;
@@ -21,7 +22,7 @@ let client: ApifyClient | null = null;
 
 function getClient(): ApifyClient {
   if (client) return client;
-  const token = process.env.APIFY_API_TOKEN;
+  const token = config.apify.token;
   if (!token) throw new Error("APIFY_API_TOKEN not configured");
   client = new ApifyClient({ token });
   return client;

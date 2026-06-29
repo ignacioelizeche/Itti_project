@@ -1,6 +1,7 @@
 import { Worker, Job } from "bullmq";
 import { config } from "../config.js";
 import { prisma } from "../lib/prisma.js";
+import { logger } from "../lib/logger.js";
 import { getQueueConnection } from "../lib/queue.js";
 import { analyzeCompany } from "../services/ai/analysis-pipeline.js";
 
@@ -19,7 +20,7 @@ const analyzeWorker = new Worker(
         where: { companyId },
       });
       if (existing) {
-        console.log(`[AnalyzeWorker] Company ${companyId} already analyzed, skipping`);
+        logger.info(`[AnalyzeWorker] Company ${companyId} already analyzed, skipping`);
         return { skipped: true };
       }
     }
@@ -35,11 +36,21 @@ const analyzeWorker = new Worker(
 );
 
 analyzeWorker.on("completed", (job) => {
-  console.log(`[AnalyzeWorker] Job ${job.id} completed for company ${job.data.companyId}`);
+  logger.info(`[AnalyzeWorker] Job ${job.id} completed for company ${job.data.companyId}`);
 });
 
 analyzeWorker.on("failed", (job, err) => {
-  console.error(`[AnalyzeWorker] Job ${job?.id} failed:`, err.message);
+  logger.error(err, `[AnalyzeWorker] Job ${job?.id} failed`);
+});
+
+analyzeWorker.on("error", (err) => {
+  logger.error(err, `[AnalyzeWorker] Worker error`);
+});
+
+analyzeWorker.waitUntilReady().then(() => {
+  logger.info("[AnalyzeWorker] Worker connected and ready");
+}).catch((err) => {
+  logger.error(err, "[AnalyzeWorker] Worker failed to connect");
 });
 
 export { analyzeWorker };

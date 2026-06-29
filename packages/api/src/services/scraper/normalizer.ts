@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { logger } from "../../lib/logger.js";
 import { slugify } from "../../utils/slug.js";
 
 interface RawCompanyData {
@@ -48,6 +49,50 @@ function normalizeCategory(rawCategory?: string): string {
 
 function generateSlug(name: string, city: string): string {
   return slugify(`${name}-${city}`);
+}
+
+// Branch name patterns: " - ", "Suc.", "Sucursal", "Local"
+const BRANCH_SEPARATORS = /\s+(?:-|Suc\.?|Sucursal|Local)\s+/i;
+
+function extractBaseName(branchName: string): string | null {
+  // Try splitting by common separators
+  const parts = branchName.split(BRANCH_SEPARATORS);
+  if (parts.length >= 2) {
+    const base = parts[0].trim();
+    // Only return if the base is meaningful (>3 chars)
+    if (base.length > 3) return base;
+  }
+  return null;
+}
+
+async function findPotentialParent(
+  prisma: PrismaClient,
+  baseName: string,
+  category: string | null,
+  city: string
+): Promise<{ id: number } | null> {
+  // Search by normalized name (case-insensitive) in the same city
+  const candidates = await prisma.company.findMany({
+    where: {
+      name: { equals: baseName, mode: "insensitive" },
+      city,
+      parentId: null, // Only link to root companies (not to other branches)
+    },
+    select: { id: true, category: true },
+  });
+
+  if (candidates.length === 0) return null;
+
+  // Prefer exact category match
+  if (category) {
+    const match = candidates.find(
+      (c) => c.category?.toLowerCase() === category.toLowerCase()
+    );
+    if (match) return match;
+  }
+
+  // Fall back to first candidate
+  return candidates[0];
 }
 
 export async function normalizeAndUpsert(
@@ -124,6 +169,19 @@ export async function normalizeAndUpsert(
     },
   });
 
+  // Auto-detect chain: if name looks like a branch, link to parent
+  const baseName = extractBaseName(name);
+  if (baseName) {
+    const parent = await findPotentialParent(prisma, baseName, data.category, city);
+    if (parent) {
+      await prisma.company.update({
+        where: { id: created.id },
+        data: { parentId: parent.id },
+      });
+      logger.info(`[Normalizer] Linked "${name}" as branch of "${baseName}" (id=${parent.id})`);
+    }
+  }
+
   return { id: created.id, isNew: true };
 }
 
@@ -141,7 +199,7 @@ export async function normalizeBatch(
       if (result.isNew) created++;
       else updated++;
     } catch (error) {
-      console.error(`Error normalizing "${data.name}":`, error);
+      logger.error(error, `Error normalizing "${data.name}"`);
       errors++;
     }
   }

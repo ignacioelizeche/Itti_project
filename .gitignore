@@ -12,3 +12,6 @@ packages/api/prisma/migration_lock.toml
 
 # Ueno alliances (datos sensibles)
 ueno alianzas/
+
+# Brag videos
+brag-output*/

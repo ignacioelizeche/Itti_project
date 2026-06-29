@@ -31,7 +31,7 @@ export function Sidebar() {
         </h1>
         <p className="text-xs text-white/50 mt-1">Buscador Inteligente</p>
       </div>
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4" aria-label="Navegación principal">
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||

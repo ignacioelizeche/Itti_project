@@ -1,3 +1,4 @@
+import { Queue } from "bullmq";
 import { config } from "../config.js";
 
 export function getQueueConnection() {
@@ -7,3 +8,7 @@ export function getQueueConnection() {
     maxRetriesPerRequest: null,
   };
 }
+
+const connectionConfig = getQueueConnection();
+
+export const enrichmentQueue = new Queue("enrichment", { connection: connectionConfig });

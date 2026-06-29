@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -22,7 +23,7 @@ interface ScoreRadarProps {
 }
 
 export function ScoreRadar({ scores }: ScoreRadarProps) {
-  const data = [
+  const data = useMemo(() => [
     { subject: "Audiencia", value: scores.audienceOverlap },
     { subject: "Compatibilidad", value: scores.ittiCompatibility },
     { subject: "Digital", value: scores.digitalPresence },
@@ -31,7 +32,7 @@ export function ScoreRadar({ scores }: ScoreRadarProps) {
     { subject: "Ubicación", value: scores.locationFit },
     { subject: "Tamaño", value: scores.businessSize },
     { subject: "Potencial", value: scores.alliancePotential },
-  ];
+  ], [scores]);
 
   return (
     <ResponsiveContainer width="100%" height={300}>

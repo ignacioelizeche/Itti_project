@@ -1,13 +1,15 @@
 import { ApifyClient } from "apify-client";
+import { config } from "../../config.js";
+import { logger } from "../../lib/logger.js";
 
 const INSTAGRAM_SCRAPER_ACTOR = "apify/instagram-scraper";
 
 let client: ApifyClient | null = null;
 
 function getClient(): ApifyClient | null {
-  const token = process.env.APIFY_API_TOKEN;
+  const token = config.apify.token;
   if (!token) {
-    console.warn("APIFY_API_TOKEN not set - Instagram scraping disabled");
+    logger.warn("APIFY_API_TOKEN not set - Instagram scraping disabled");
     return null;
   }
   if (!client) {
@@ -48,7 +50,7 @@ export async function scrapeInstagramViaApify(
   if (!cleanUsername) return null;
 
   try {
-    console.log(`[Apify] Scraping @${cleanUsername}...`);
+    logger.info(`[Apify] Scraping @${cleanUsername}...`);
 
     const run = await apify.actor(INSTAGRAM_SCRAPER_ACTOR).call(
       {
@@ -64,7 +66,7 @@ export async function scrapeInstagramViaApify(
       .listItems();
 
     if (!items || items.length === 0) {
-      console.log(`[Apify] No results for @${cleanUsername}`);
+      logger.info(`[Apify] No results for @${cleanUsername}`);
       return null;
     }
 
@@ -90,7 +92,7 @@ export async function scrapeInstagramViaApify(
       0
     );
 
-    console.log(
+    logger.info(
       `[Apify] @${cleanUsername}: ${profile.followersCount} followers, ${profile.postsCount} posts`
     );
 
@@ -109,10 +111,7 @@ export async function scrapeInstagramViaApify(
       recentPosts,
     };
   } catch (error: any) {
-    console.error(
-      `[Apify] Instagram scraping failed for @${cleanUsername}:`,
-      error.message || error
-    );
+    logger.error(error, `[Apify] Instagram scraping failed for @${cleanUsername}`);
     return null;
   }
 }

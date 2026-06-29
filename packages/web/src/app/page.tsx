@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api, type Stats, type CompanyWithScore } from "@/lib/api";
 import { ScoreBadge } from "@/components/scoring/ScoreBadge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [topCompanies, setTopCompanies] = useState<CompanyWithScore[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     Promise.all([api.getStats(), api.getTopCompanies(10)])
@@ -23,12 +24,21 @@ export default function Dashboard() {
         setStats(s);
         setTopCompanies(c.companies);
       })
-      .catch(console.error)
+      .catch(() => setError("Error al cargar datos. Verificá que la API esté disponible."))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return <LoadingSpinner className="h-64" />;
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <div className="p-4 bg-red-50 text-red-700 rounded-lg">{error}</div>
+      </div>
+    );
   }
 
   return (

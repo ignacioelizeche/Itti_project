@@ -25,6 +25,10 @@ export const config = {
     mapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "",
   },
 
+  apify: {
+    token: process.env.APIFY_API_TOKEN || "",
+  },
+
   scraper: {
     googlePlacesRadius: parseInt(process.env.SCRAPER_GOOGLE_RADIUS || "15000", 10),
     googlePlacesMaxResults: parseInt(process.env.SCRAPER_GOOGLE_MAX_RESULTS || "20", 10),

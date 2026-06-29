@@ -1,11 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { Queue } from "bullmq";
 import { prisma } from "../lib/prisma.js";
-import { getQueueConnection } from "../lib/queue.js";
-
-const enrichmentQueue = new Queue("enrichment", {
-  connection: getQueueConnection(),
-});
+import { enrichmentQueue } from "../lib/queue.js";
 
 export async function enrichmentRoutes(fastify: FastifyInstance) {
   // GET /api/enrich/companies - Get companies with enrichment status
