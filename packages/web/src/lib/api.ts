@@ -94,9 +94,9 @@ export interface Stats {
 }
 
 export const api = {
-  getTopCompanies: (limit = 10, category?: string) =>
+  getTopCompanies: (limit = 10, category?: string, hideAllied = false) =>
     fetchAPI<{ companies: CompanyWithScore[] }>(
-      `/scores/top?limit=${limit}${category ? `&category=${category}` : ""}`
+      `/scores/top?limit=${limit}${category ? `&category=${category}` : ""}${hideAllied ? `&hideAllied=true` : ""}`
     ),
 
   getStats: () => fetchAPI<Stats>("/scores/stats"),

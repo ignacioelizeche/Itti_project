@@ -38,14 +38,20 @@ export async function statsRoutes(fastify: FastifyInstance) {
 
   // GET /api/scores/top - Top companies by affinity score
   fastify.get<{
-    Querystring: { limit?: string; category?: string; minScore?: string };
+    Querystring: { limit?: string; category?: string; minScore?: string; hideAllied?: string };
   }>("/top", async (request) => {
-    const { limit = "10", category, minScore } = request.query;
+    const { limit = "10", category, minScore, hideAllied } = request.query;
 
     const companies = await prisma.company.findMany({
       where: {
         score: { isNot: null },
         ...(category && { category }),
+        ...(hideAllied === "true" && {
+          OR: [
+            { allianceStatus: null },
+            { allianceStatus: "" },
+          ],
+        }),
       },
       include: {
         score: true,

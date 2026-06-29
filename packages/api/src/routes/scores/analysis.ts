@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { config } from "../../config.js";
 import { prisma } from "../../lib/prisma.js";
-import { analyzeQueue } from "../../services/ai/analysis-pipeline.js";
+import { analyzeCompany } from "../../services/ai/analysis-pipeline.js";
 import { AnalyzeSchema } from "../../schemas/index.js";
 import { validateOrReply } from "../../lib/validate.js";
+import { logger } from "../../lib/logger.js";
+
+let batchRunning = false;
 
 export async function analysisRoutes(fastify: FastifyInstance) {
   // POST /api/scores/analyze/:companyId - Trigger analysis for a company
@@ -43,18 +45,13 @@ export async function analysisRoutes(fastify: FastifyInstance) {
       }
     }
 
-    const job = await analyzeQueue.add(
-      `analyze-${companyId}`,
-      { companyId: parseInt(companyId), force },
-      {
-        attempts: config.workers.analyzeAttempts,
-        backoff: { type: "exponential", delay: config.workers.analyzeBackoffDelay },
-      }
-    );
+    // Run analysis directly in the request (background via queue was unreliable)
+    analyzeCompany(parseInt(companyId)).catch((err) => {
+      logger.error(err, `[Analysis] Direct analysis failed for company ${companyId}`);
+    });
 
     return {
       message: "Analysis started",
-      jobId: job.id,
       companyId: parseInt(companyId),
     };
   });
@@ -67,7 +64,11 @@ export async function analysisRoutes(fastify: FastifyInstance) {
       tags: ["Scoring"],
       summary: "Analizar múltiples empresas en lote",
     },
-  }, async (request) => {
+  }, async (request, reply) => {
+    if (batchRunning) {
+      return reply.status(409).send({ error: "Ya hay un batch de análisis en progreso. Esperá a que termine." });
+    }
+
     const { category, limit = 50, force = false } = request.body;
 
     const where: Record<string, unknown> = {};
@@ -82,22 +83,28 @@ export async function analysisRoutes(fastify: FastifyInstance) {
       take: limit,
     });
 
-    let queued = 0;
-    for (const company of companies) {
-      await analyzeQueue.add(
-        `analyze-${company.id}`,
-        { companyId: company.id, force },
-        {
-          attempts: config.workers.analyzeAttempts,
-          backoff: { type: "exponential", delay: config.workers.analyzeBackoffDelay },
-        }
-      );
-      queued++;
+    if (companies.length === 0) {
+      return { message: "No hay empresas pendientes de análisis", processed: 0 };
     }
 
+    // Run analyses sequentially in background (fire and forget)
+    batchRunning = true;
+    const runBatch = async () => {
+      for (const company of companies) {
+        try {
+          await analyzeCompany(company.id);
+        } catch (err) {
+          logger.error(err, `[Analysis] Batch failed for ${company.name} (id=${company.id})`);
+        }
+      }
+      batchRunning = false;
+      logger.info(`[Analysis] Batch complete: ${companies.length} companies analyzed`);
+    };
+    runBatch();
+
     return {
-      message: `Queued ${queued} companies for full pipeline (enrichment + analysis)`,
-      category: category || "all",
+      message: `Análisis iniciado para ${companies.length} empresas (se procesan en segundo plano)`,
+      total: companies.length,
     };
   });
 }
