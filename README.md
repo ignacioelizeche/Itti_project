@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/18c86a3e-95f9-4b61-b4b0-90ec3d777aa9
-
 # Alliance Finder — Intelligent Partnership Discovery for Ueno Bank
 
 > Finding the right business partners shouldn't take weeks. Ollama does it in minutes.
