@@ -151,7 +151,7 @@ API_PORT=3001
 NODE_ENV=development
 ```
 
-### 3. Iniciar servicios基础
+### 3. Iniciar servicios
 
 ```bash
 # PostgreSQL + Redis
