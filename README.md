@@ -309,8 +309,3 @@ itti-alliances/
 | `API_PORT` | Puerto del backend (default: 3001) | No |
 | `NODE_ENV` | Entorno (development/production) | No |
 
----
-
-## Licencia
-
-Proyecto privado — Itti / Ueno Bank
