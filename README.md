@@ -12,14 +12,9 @@
 
 ## Demo
 
-https://github.com/user-projects/assets/brag-output-2026-06-29-153000/brag.mp4
+<video src="brag-output-2026-06-29-143022/brag.mp4" controls width="100%">Tu navegador no soporta video. <a href="brag-output-2026-06-29-143022/brag.mp4">Descargá el video</a>.</video>
 
 **511 empresas en Paraguay. 398 analizadas por IA local. 8 criterios ponderados. Un pipeline — desde consulta en lenguaje natural hasta decisión de aprobar/rechazar.**
-
-O ver los videos directamente:
-- [Demo final (20s)](brag-output-2026-06-29-153000/brag.mp4)
-- [Versión alternativa 1](brag-output-2026-06-29-150000/brag.mp4)
-- [Versión alternativa 2](brag-output-2026-06-29-143022/brag.mp4)
 
 ---
 
