@@ -12,7 +12,7 @@
 
 ## Demo
 
-[![Demo Video](brag-output-2026-06-29-143022/thumbnail.jpg)](https://raw.githubusercontent.com/ignacioelizeche/Itti_project/main/brag-output-2026-06-29-143022/brag.mp4)
+[![Demo Video](brag-output-2026-06-29-143022/thumbnail.jpg)](https://github.com/ignacioelizeche/Itti_project/blob/main/brag-output-2026-06-29-143022/brag.mp4)
 
 > **[▶ Ver video completo (20 s)](https://raw.githubusercontent.com/ignacioelizeche/Itti_project/main/brag-output-2026-06-29-143022/brag.mp4)**
 
