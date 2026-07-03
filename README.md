@@ -1,6 +1,43 @@
-# Ueno Alliances - Buscador Inteligente de Alianzas Comerciales
+# Alliance Finder — Intelligent Partnership Discovery for Ueno Bank
 
-Sistema de descubrimiento y análisis de alianzas comerciales para Ueno Bank (Paraguay). Utiliza IA local para analizar, puntuar y recomendar empresas como potenciales socios comerciales.
+> Finding the right business partners shouldn't take weeks. Ollama does it in minutes.
+
+![511 companies](https://img.shields.io/badge/Empresas-511-0066FF?style=flat-square)
+![398 analyzed](https://img.shields.io/badge/Analizadas-398-10B981?style=flat-square)
+![8 criteria](https://img.shields.io/badge/Criterios-8-F59E0B?style=flat-square)
+![100% local](https://img.shields.io/badge/IA-100%25%20Local-8B5CF6?style=flat-square)
+![Zero cloud](https://img.shields.io/badge/Cloud-Zero%20Dependencies-EF4444?style=flat-square)
+
+---
+
+## Demo
+
+https://github.com/user-projects/assets/brag-output-2026-06-29-153000/brag.mp4
+
+**511 empresas en Paraguay. 398 analizadas por IA local. 8 criterios ponderados. Un pipeline — desde consulta en lenguaje natural hasta decisión de aprobar/rechazar.**
+
+O ver los videos directamente:
+- [Demo final (20s)](brag-output-2026-06-29-153000/brag.mp4)
+- [Versión alternativa 1](brag-output-2026-06-29-150000/brag.mp4)
+- [Versión alternativa 2](brag-output-2026-06-29-143022/brag.mp4)
+
+---
+
+## El Problema
+
+Encontrar alianzas comerciales para un banco como Ueno requiere semanas de investigación manual: buscar empresas, verificar datos, evaluar compatibilidad, tomar decisiones. **El equipo pierde tiempo en tareas repetitivas que una IA puede hacer en minutos.**
+
+## La Solución
+
+Un sistema que convierte una consulta en lenguaje natural ("restaurantes saludables con buen Instagram en Asunción") en una lista rankeada de empresas socias potenciales, analizadas con IA local y listas para decidir.
+
+**Pipeline completo en 4 pasos:**
+1. **Descubrir** — El usuario describe lo que busca → la IA genera consultas optimizadas
+2. **Recolectar** — Google Places + Instagram + Facebook + web scraping → datos completos
+3. **Analizar** — Ollama evalúa 8 criterios ponderados → score de 0 a 100 + justificación
+4. **Decidir** — El equipo aprueba o rechaza cada alianza con contexto completo
+
+---
 
 ## Arquitectura
 
@@ -238,21 +275,30 @@ itti-alliances/
 └── package.json              # Root config
 ```
 
-## Tecnologías de IA
+## Score de Afinidad — 8 Criterios Ponderados
 
-### Modelos Utilizados
-- **llama3.1:8b** (Ollama) → Análisis, scoring, generación de justificaciones
-- **nomic-embed-text** (Ollama) → Generación de embeddings vectoriales
+| Criterio | Peso | Qué evalúa |
+|----------|------|-----------|
+| **Audiencia** | 25% | Que el público coincida con usuarios Ueno (jóvenes 18-35, urbanos, digitales) |
+| **Compatibilidad Ueno** | 20% | Capacidad de ofrecer beneficios: descuentos, cashback, 2x1 |
+| **Presencia Digital** | 15% | Fuerza en redes sociales = más visibilidad para promociones |
+| **Reputación** | 12% | Ratings y reseñas altas = confianza del público |
+| **Rubro** | 10% | Relevancia del sector para el estilo de vida Ueno |
+| **Ubicación** | 8% | Presencia en zonas de alta concentración de usuarios |
+| **Tamaño** | 5% | Capacidad de ejecutar alianzas |
+| **Potencial** | 5% | Señales de participación en programas similares |
 
-### Pipeline de Análisis
-```
-Empresa → Extracción de Atributos (LLM) → Score de Afinidad (LLM) → Justificación (LLM) → Embedding (Vector)
-```
+---
 
-### Búsqueda Semántica
-- Embeddings de 768 dimensiones almacenados en pgvector
-- Búsqueda por similitud coseno
-- Fallback a búsqueda por texto cuando Ollama no está disponible
+## Por Qué Ollama (No la Nube)
+
+- **Datos sensibles** — Información de empresas y alianzas bancarias nunca sale del servidor
+- **Sin costos recurrentes** — $0/mes en tokens de API (vs. cientos con OpenAI/Claude)
+- **Sin dependencia externa** — Funciona sin internet, sin rate limits, sin downtime de proveedores
+- **Velocidad** — llama3.1:8b en CPU local: ~10-15 tok/sec, suficiente para el pipeline
+- **Control total** — Modelo ajustable, fine-tuneable, ejecutable en cualquier momento
+
+---
 
 ## Variables de Entorno
 
@@ -268,6 +314,8 @@ Empresa → Extracción de Atributos (LLM) → Score de Afinidad (LLM) → Justi
 | `API_PORT` | Puerto del backend (default: 3001) | No |
 | `NODE_ENV` | Entorno (development/production) | No |
 
+---
+
 ## Licencia
 
-Proyecto privado - Itti / Ueno Bank
+Proyecto privado — Itti / Ueno Bank

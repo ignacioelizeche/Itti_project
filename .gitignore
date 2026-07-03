@@ -13,5 +13,5 @@ packages/api/prisma/migration_lock.toml
 # Ueno alliances (datos sensibles)
 ueno alianzas/
 
-# Brag videos
-brag-output*/
+# Brag videos - solo ignorar compositiones temporales
+brag-output*/composition/
