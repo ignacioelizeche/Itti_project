@@ -12,9 +12,9 @@
 
 ## Demo
 
-[![Demo Video](brag-output-2026-06-29-143022/thumbnail.jpg)](https://github.com/ignacioelizeche/Itti_project/releases/download/v1.0/demo.mp4)
+[![Demo Video](brag-output-2026-06-29-143022/thumbnail.jpg)]([https://github.com/ignacioelizeche/Itti_project/releases/download/v1.0/demo.mp4](https://github.com/ignacioelizeche/Itti_project/blob/main/brag-output-2026-06-29-143022/brag.mp4))
 
-> **[▶ Ver video completo (20s)](https://github.com/ignacioelizeche/Itti_project/releases/download/v1.0/demo.mp4)**
+> **[▶ Ver video completo (20s)]([https://github.com/ignacioelizeche/Itti_project/releases/download/v1.0/demo.mp4](https://github.com/ignacioelizeche/Itti_project/blob/main/brag-output-2026-06-29-143022/brag.mp4))**
 
 **511 empresas en Paraguay. 398 analizadas por IA local. 8 criterios ponderados. Un pipeline — desde consulta en lenguaje natural hasta decisión de aprobar/rechazar.**
 
