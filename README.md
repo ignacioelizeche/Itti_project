@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/18c86a3e-95f9-4b61-b4b0-90ec3d777aa9
+
 # Alliance Finder — Intelligent Partnership Discovery for Ueno Bank
 
 > Finding the right business partners shouldn't take weeks. Ollama does it in minutes.
@@ -12,9 +16,7 @@
 
 ## Demo
 
-[![Demo Video](brag-output-2026-06-29-143022/thumbnail.jpg)](https://github.com/ignacioelizeche/Itti_project/blob/main/brag-output-2026-06-29-143022/brag.mp4)
-
-> **[▶ Ver video completo (20 s)](https://raw.githubusercontent.com/ignacioelizeche/Itti_project/main/brag-output-2026-06-29-143022/brag.mp4)**
+https://github.com/user-attachments/assets/18c86a3e-95f9-4b61-b4b0-90ec3d777aa9
 
 **511 empresas en Paraguay. 398 analizadas por IA local. 8 criterios ponderados. Un pipeline — desde consulta en lenguaje natural hasta decisión de aprobar/rechazar.**
 
