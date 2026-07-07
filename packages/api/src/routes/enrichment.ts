@@ -6,8 +6,13 @@ export async function enrichmentRoutes(fastify: FastifyInstance) {
   // GET /api/enrich/companies - Get companies with enrichment status
   fastify.get<{
     Querystring: { limit?: string; enriched?: string };
-  }>("/companies", async (request) => {
-    const { limit = "50", enriched } = request.query;
+  }>("/companies", async (request, reply) => {
+    const { limit: rawLimit = "50", enriched } = request.query;
+
+    const parsedLimit = parseInt(rawLimit);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      return reply.status(400).send({ error: "Invalid limit parameter" });
+    }
 
     const where: any = {};
     if (enriched === "true") {
@@ -21,7 +26,7 @@ export async function enrichmentRoutes(fastify: FastifyInstance) {
 
     const companies = await prisma.company.findMany({
       where,
-      take: parseInt(limit),
+      take: parsedLimit,
       orderBy: { id: "asc" },
       select: {
         id: true,
@@ -117,13 +122,18 @@ export async function enrichmentRoutes(fastify: FastifyInstance) {
   // GET /api/enrich/recent - Get recent enrichment jobs
   fastify.get<{
     Querystring: { limit?: string };
-  }>("/recent", async (request) => {
-    const { limit = "20" } = request.query;
+  }>("/recent", async (request, reply) => {
+    const { limit: rawLimit = "20" } = request.query;
+
+    const parsedLimit = parseInt(rawLimit);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      return reply.status(400).send({ error: "Invalid limit parameter" });
+    }
 
     const jobs = await enrichmentQueue.getJobs(
       ["completed", "failed", "active", "waiting"],
       0,
-      parseInt(limit) - 1
+      parsedLimit - 1
     );
 
     return {

@@ -49,12 +49,17 @@ export async function searchRoutes(fastify: FastifyInstance) {
   // GET /api/search/logs - Recent search logs
   fastify.get<{
     Querystring: { limit?: string };
-  }>("/logs", async (request) => {
-    const { limit = "20" } = request.query;
+  }>("/logs", async (request, reply) => {
+    const { limit: rawLimit = "20" } = request.query;
+
+    const parsedLimit = parseInt(rawLimit);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      return reply.status(400).send({ error: "Invalid limit parameter" });
+    }
 
     const logs = await prisma.searchLog.findMany({
       orderBy: { createdAt: "desc" },
-      take: parseInt(limit),
+      take: parsedLimit,
     });
 
     return { logs };

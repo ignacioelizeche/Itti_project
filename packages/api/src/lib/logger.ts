@@ -1,5 +1,5 @@
 import pino from "pino";
 
 export const logger = pino({
-  level: process.env.NODE_ENV === "development" ? "info" : "warn",
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === "development" ? "info" : "info"),
 });

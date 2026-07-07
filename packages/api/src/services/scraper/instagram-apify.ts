@@ -104,7 +104,7 @@ export async function scrapeInstagramViaApify(
       followsCount: profile.followsCount || 0,
       postsCount: profile.postsCount || 0,
       isBusinessAccount: profile.isBusinessAccount || false,
-      isVerified: profile.verified || false,
+      isVerified: profile.isVerified || false,
       profilePicUrl: profile.profilePicUrl || "",
       externalUrl: profile.externalUrl || null,
       businessCategoryName: profile.businessCategoryName || null,

@@ -62,13 +62,18 @@ export async function scrapeRoutes(fastify: FastifyInstance) {
   // GET /api/scrape/jobs - List all scrape jobs
   fastify.get<{
     Querystring: { status?: string; limit?: string };
-  }>("/jobs", async (request) => {
-    const { status, limit = "20" } = request.query;
+  }>("/jobs", async (request, reply) => {
+    const { status, limit: rawLimit = "20" } = request.query;
+
+    const parsedLimit = parseInt(rawLimit);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      return reply.status(400).send({ error: "Invalid limit parameter" });
+    }
 
     const jobs = await prisma.scrapeJob.findMany({
       where: status ? { status } : undefined,
       orderBy: { createdAt: "desc" },
-      take: parseInt(limit),
+      take: parsedLimit,
     });
 
     return { jobs };
@@ -79,9 +84,13 @@ export async function scrapeRoutes(fastify: FastifyInstance) {
     Params: { id: string };
   }>("/jobs/:id", async (request, reply) => {
     const { id } = request.params;
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return reply.status(400).send({ error: "Invalid job ID" });
+    }
 
     const job = await prisma.scrapeJob.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: parsedId },
     });
 
     if (!job) {

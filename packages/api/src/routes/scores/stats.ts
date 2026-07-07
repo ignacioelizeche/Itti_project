@@ -39,8 +39,13 @@ export async function statsRoutes(fastify: FastifyInstance) {
   // GET /api/scores/top - Top companies by affinity score
   fastify.get<{
     Querystring: { limit?: string; category?: string; minScore?: string; hideAllied?: string };
-  }>("/top", async (request) => {
-    const { limit = "10", category, minScore, hideAllied } = request.query;
+  }>("/top", async (request, reply) => {
+    const { limit: rawLimit = "10", category, minScore, hideAllied } = request.query;
+
+    const parsedLimit = parseInt(rawLimit);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      return reply.status(400).send({ error: "Invalid limit parameter" });
+    }
 
     const companies = await prisma.company.findMany({
       where: {
@@ -60,7 +65,7 @@ export async function statsRoutes(fastify: FastifyInstance) {
         },
       },
       orderBy: { score: { totalScore: "desc" } },
-      take: parseInt(limit),
+      take: parsedLimit,
     });
 
     const filtered = minScore
@@ -97,7 +102,12 @@ export async function statsRoutes(fastify: FastifyInstance) {
     Querystring: { limit?: string };
   }>("/by-category/:category", async (request, reply) => {
     const { category } = request.params;
-    const { limit = "20" } = request.query;
+    const { limit: rawLimit = "20" } = request.query;
+
+    const parsedLimit = parseInt(rawLimit);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      return reply.status(400).send({ error: "Invalid limit parameter" });
+    }
 
     const companies = await prisma.company.findMany({
       where: {
@@ -111,7 +121,7 @@ export async function statsRoutes(fastify: FastifyInstance) {
         },
       },
       orderBy: { score: { totalScore: "desc" } },
-      take: parseInt(limit),
+      take: parsedLimit,
     });
 
     if (companies.length === 0) {

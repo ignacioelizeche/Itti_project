@@ -32,6 +32,7 @@ const analyzeWorker = new Worker(
   {
     connection: getQueueConnection(),
     concurrency: config.workers.concurrency,
+    lockDuration: 300000,
   }
 );
 

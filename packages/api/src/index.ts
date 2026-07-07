@@ -10,6 +10,8 @@ import { searchRoutes } from "./routes/search.js";
 import { enrichmentRoutes } from "./routes/enrichment.js";
 import { discoverRoutes } from "./routes/discover.js";
 import { enrichmentWorker } from "./workers/enrichment-worker.js";
+import { scrapeWorker } from "./workers/scrape-worker.js";
+import { analyzeWorker } from "./workers/analyze-worker.js";
 
 const fastify = Fastify({
   logger: {
@@ -42,7 +44,11 @@ async function bootstrap() {
 
   // Graceful shutdown
   fastify.addHook("onClose", async () => {
-    await enrichmentWorker.close();
+    await Promise.all([
+      enrichmentWorker.close(),
+      scrapeWorker.close(),
+      analyzeWorker.close(),
+    ]);
   });
 
   process.on("SIGTERM", async () => {

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { prisma } from "../../lib/prisma.js";
 import { analyzeCompany } from "../../services/ai/analysis-pipeline.js";
 import { AnalyzeSchema } from "../../schemas/index.js";
@@ -6,6 +6,15 @@ import { validateOrReply } from "../../lib/validate.js";
 import { logger } from "../../lib/logger.js";
 
 let batchRunning = false;
+
+function parseCompanyId(companyId: string, reply: FastifyReply): number | null {
+  const id = parseInt(companyId);
+  if (isNaN(id)) {
+    reply.status(400).send({ error: "Invalid companyId" });
+    return null;
+  }
+  return id;
+}
 
 export async function analysisRoutes(fastify: FastifyInstance) {
   // POST /api/scores/analyze/:companyId - Trigger analysis for a company
@@ -20,13 +29,16 @@ export async function analysisRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const { companyId } = request.params;
 
+    const id = parseCompanyId(companyId, reply);
+    if (id === null) return;
+
     const data = validateOrReply(AnalyzeSchema, request.body || {}, reply);
     if (!data) return;
 
     const { force } = data;
 
     const company = await prisma.company.findUnique({
-      where: { id: parseInt(companyId) },
+      where: { id },
     });
 
     if (!company) {
@@ -35,7 +47,7 @@ export async function analysisRoutes(fastify: FastifyInstance) {
 
     if (!force) {
       const existing = await prisma.companyScore.findUnique({
-        where: { companyId: parseInt(companyId) },
+        where: { companyId: id },
       });
       if (existing) {
         return {
@@ -46,13 +58,13 @@ export async function analysisRoutes(fastify: FastifyInstance) {
     }
 
     // Run analysis directly in the request (background via queue was unreliable)
-    analyzeCompany(parseInt(companyId)).catch((err) => {
+    analyzeCompany(id).catch((err) => {
       logger.error(err, `[Analysis] Direct analysis failed for company ${companyId}`);
     });
 
     return {
       message: "Analysis started",
-      companyId: parseInt(companyId),
+      companyId: id,
     };
   });
 
@@ -100,7 +112,10 @@ export async function analysisRoutes(fastify: FastifyInstance) {
       batchRunning = false;
       logger.info(`[Analysis] Batch complete: ${companies.length} companies analyzed`);
     };
-    runBatch();
+    runBatch().catch((err) => {
+      logger.error(err, `[Analysis] Batch crashed`);
+      batchRunning = false;
+    });
 
     return {
       message: `Análisis iniciado para ${companies.length} empresas (se procesan en segundo plano)`,

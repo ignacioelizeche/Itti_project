@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import Fastify from "fastify";
+import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import corsPlugin from "../plugins/cors.js";
 import redisPlugin from "../plugins/redis.js";
 import rateLimitPlugin from "../plugins/rate-limit.js";
@@ -25,7 +25,7 @@ beforeAll(async () => {
   app.get("/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
 
   // Global error handler (matches index.ts)
-  app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
+  app.setErrorHandler((error: Error & { statusCode?: number }, _request: FastifyRequest, reply: FastifyReply) => {
     const statusCode = error.statusCode || 500;
     reply.status(statusCode).send({
       error: statusCode === 500 ? "Internal server error" : error.message,
@@ -142,13 +142,15 @@ describe("Scores - Company", () => {
     expect([200, 404]).toContain(res.statusCode);
   });
 
-  it("PATCH /api/scores/company/1 - invalid URL returns 400", async () => {
+  it("PATCH /api/scores/company/1 - empty website is cleaned to null", async () => {
     const res = await app.inject({
       method: "PATCH",
       url: "/api/scores/company/1",
-      payload: { website: "not-a-url" },
+      payload: { website: "" },
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.company.website).toBeNull();
   });
 });
 

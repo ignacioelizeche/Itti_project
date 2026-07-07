@@ -151,6 +151,41 @@ export const api = {
       { method: "POST", body: JSON.stringify({ query, autoEnrich }) }
     ),
 
+  discoverStream: async function* (query: string, autoEnrich = true) {
+    const res = await fetch(`${API_BASE}/discover`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({ query, autoEnrich }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`API ${res.status}`);
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      let eventType = "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          eventType = line.slice(7);
+        } else if (line.startsWith("data: ")) {
+          const data = JSON.parse(line.slice(6));
+          yield { event: eventType, data };
+        }
+      }
+    }
+  },
+
   search: (query: string, options?: { limit?: number; category?: string; minScore?: number }) =>
     fetchAPI<{ results: SearchResult[]; total: number }>("/search", {
       method: "POST",

@@ -115,19 +115,29 @@ export async function chatCompletionJSON<T>(
 }
 
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const response = await fetch(`${config.ollama.url}/api/embeddings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: config.ollama.embedModel,
-      prompt: text,
-    }),
+  return ollamaRequestWithRetry(async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), config.ollama.timeout);
+
+    try {
+      const response = await fetch(`${config.ollama.url}/api/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: config.ollama.embedModel,
+          prompt: text,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ollama embedding error: ${response.status}`);
+      }
+
+      const data = (await response.json()) as { embedding: number[] };
+      return data.embedding;
+    } finally {
+      clearTimeout(timeout);
+    }
   });
-
-  if (!response.ok) {
-    throw new Error(`Ollama embedding error: ${response.status}`);
-  }
-
-  const data = (await response.json()) as { embedding: number[] };
-  return data.embedding;
 }

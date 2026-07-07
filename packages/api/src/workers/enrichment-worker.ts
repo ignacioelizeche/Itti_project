@@ -9,16 +9,16 @@ const enrichmentWorker = new Worker(
   async (job: Job) => {
     const { companyId, batch, limit } = job.data;
     if (batch) {
-      const enriched = await enrichBatch(limit || 10);
+      const enriched = await enrichBatch(limit ?? 10);
       return { enriched, type: "batch" };
     }
     if (companyId) {
       const result = await enrichCompany(companyId);
       return { result, type: "single" };
     }
-    return { error: "No companyId or batch flag provided" };
+    throw new Error("No companyId or batch flag provided");
   },
-  { connection: getQueueConnection(), concurrency: config.workers.concurrency }
+  { connection: getQueueConnection(), concurrency: config.workers.concurrency, lockDuration: 300000 }
 );
 
 enrichmentWorker.on("completed", (job) => {

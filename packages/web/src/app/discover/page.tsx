@@ -11,6 +11,7 @@ export default function DiscoverPage() {
   const [results, setResults] = useState<DiscoveredCompany[]>([]);
   const [generatedQueries, setGeneratedQueries] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [progress, setProgress] = useState("");
 
   const handleSearch = async () => {
     if (!query.trim() || query.trim().length < 3) return;
@@ -18,15 +19,33 @@ export default function DiscoverPage() {
     setLoading(true);
     setResults([]);
     setGeneratedQueries([]);
-    setMessage("Generando consultas de búsqueda con IA...");
+    setMessage("");
+    setProgress("Iniciando...");
 
     try {
-      const data = await api.discover(query.trim(), true);
-      setGeneratedQueries(data.generatedQueries);
-      setResults(data.companies);
-      setMessage(`Encontré ${data.totalFound} empresas. ${data.newCompanies} nuevas se están enriqueciendo automáticamente.`);
+      for await (const event of api.discoverStream(query.trim(), true)) {
+        switch (event.event) {
+          case "progress":
+            setProgress(event.data.message);
+            break;
+          case "queries":
+            setGeneratedQueries(event.data.queries);
+            setProgress("Buscando empresas en Google Places...");
+            break;
+          case "result":
+            setResults(event.data.companies);
+            setMessage(`Encontré ${event.data.totalFound} empresas. ${event.data.newCompanies} nuevas se están enriqueciendo automáticamente.`);
+            setProgress("");
+            break;
+          case "error":
+            setMessage("Error: " + event.data.error);
+            setProgress("");
+            break;
+        }
+      }
     } catch (err) {
       setMessage("Error de conexión");
+      setProgress("");
     } finally {
       setLoading(false);
     }
@@ -73,7 +92,7 @@ export default function DiscoverPage() {
             {loading ? (
               <>
                 <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                Buscando...
+                {progress || "Buscando..."}
               </>
             ) : (
               <>

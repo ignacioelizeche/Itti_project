@@ -26,11 +26,28 @@ export const DecideSchema = z.object({
 });
 
 export const CompanyUpdateSchema = z.object({
-  website: z.string().url().optional().nullable(),
-  instagram: z.string().optional().nullable(),
-  facebook: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  email: z.string().email().optional().nullable(),
+  website: z.string().optional().nullable().transform((v) => {
+    if (!v || v.trim() === "") return null;
+    // Add https:// if no protocol
+    if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+    try { new URL(v); return v; } catch { return null; }
+  }),
+  instagram: z.string().optional().nullable().transform((v) => {
+    if (!v || v.trim() === "") return null;
+    return v;
+  }),
+  facebook: z.string().optional().nullable().transform((v) => {
+    if (!v || v.trim() === "") return null;
+    return v;
+  }),
+  phone: z.string().optional().nullable().transform((v) => {
+    if (!v || v.trim() === "") return null;
+    return v;
+  }),
+  email: z.string().optional().nullable().transform((v) => {
+    if (!v || v.trim() === "") return null;
+    try { z.string().email().parse(v); return v; } catch { return null; }
+  }),
 });
 
 export const ScrapeTriggerSchema = z.object({

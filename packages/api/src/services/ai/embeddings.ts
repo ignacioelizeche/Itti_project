@@ -27,14 +27,10 @@ function buildEmbeddingContent(company: {
     .join(" | ");
 }
 
-function simpleHash(text: string): string {
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(36);
+import { createHash } from "crypto";
+
+function contentHash(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
 }
 
 export async function generateAndStoreEmbedding(companyId: number): Promise<void> {
@@ -46,7 +42,7 @@ export async function generateAndStoreEmbedding(companyId: number): Promise<void
   if (!company) throw new Error(`Company ${companyId} not found`);
 
   const content = buildEmbeddingContent(company);
-  const contentHash = simpleHash(content);
+  const hash = contentHash(content);
 
   // Check existing embedding
   const existing = await prisma.$queryRawUnsafe<Array<{ content_hash: string }>>(
@@ -54,7 +50,7 @@ export async function generateAndStoreEmbedding(companyId: number): Promise<void
     companyId
   );
 
-  if (existing.length > 0 && existing[0].content_hash === contentHash) {
+  if (existing.length > 0 && existing[0].content_hash === hash) {
     return;
   }
 
@@ -65,7 +61,7 @@ export async function generateAndStoreEmbedding(companyId: number): Promise<void
     await prisma.$executeRawUnsafe(
       'UPDATE "CompanyEmbedding" SET embedding = $1::vector, content_hash = $2, created_at = NOW() WHERE company_id = $3',
       embeddingStr,
-      contentHash,
+      hash,
       companyId
     );
   } else {
@@ -73,7 +69,7 @@ export async function generateAndStoreEmbedding(companyId: number): Promise<void
       'INSERT INTO "CompanyEmbedding" (company_id, embedding, content_hash, created_at) VALUES ($1, $2::vector, $3, NOW())',
       companyId,
       embeddingStr,
-      contentHash
+      hash
     );
   }
 }

@@ -21,9 +21,13 @@ export async function companyRoutes(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const { companyId } = request.params;
+    const parsedCompanyId = parseInt(companyId);
+    if (isNaN(parsedCompanyId)) {
+      return reply.status(400).send({ error: "Invalid companyId" });
+    }
 
     const company = await prisma.company.findUnique({
-      where: { id: parseInt(companyId) },
+      where: { id: parsedCompanyId },
       include: {
         score: true,
         analysis: true,
@@ -64,6 +68,9 @@ export async function companyRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const { companyId } = request.params;
     const id = parseInt(companyId);
+    if (isNaN(id)) {
+      return reply.status(400).send({ error: "Invalid companyId" });
+    }
 
     const company = await prisma.company.findUnique({
       where: { id },
@@ -143,6 +150,9 @@ export async function companyRoutes(fastify: FastifyInstance) {
     const { companyId } = request.params;
     const { action, targetId } = request.body;
     const id = parseInt(companyId);
+    if (isNaN(id)) {
+      return reply.status(400).send({ error: "Invalid companyId" });
+    }
 
     if (id === targetId) {
       return reply.status(400).send({ error: "Cannot link company to itself" });
@@ -158,6 +168,21 @@ export async function companyRoutes(fastify: FastifyInstance) {
     }
 
     if (action === "link") {
+      // Cycle detection: ensure targetId is not an ancestor of company
+      const ancestors = await prisma.$queryRawUnsafe<Array<{ id: number }>>(
+        `WITH RECURSIVE ancestors AS (
+          SELECT id, parent_id FROM "Company" WHERE id = $1
+          UNION ALL
+          SELECT c.id, c.parent_id FROM "Company" c INNER JOIN ancestors a ON c.id = a.parent_id
+        ) SELECT id FROM ancestors WHERE id = $2`,
+        id,
+        targetId
+      );
+
+      if (ancestors.length > 0) {
+        return reply.status(400).send({ error: "Cannot create circular reference" });
+      }
+
       // Link target as branch of company (company becomes parent)
       await prisma.company.update({
         where: { id: targetId },
@@ -181,6 +206,10 @@ export async function companyRoutes(fastify: FastifyInstance) {
     Params: { companyId: string };
   }>("/company/:companyId", async (request, reply) => {
     const { companyId } = request.params;
+    const parsedCompanyId = parseInt(companyId);
+    if (isNaN(parsedCompanyId)) {
+      return reply.status(400).send({ error: "Invalid companyId" });
+    }
 
     const data = validateOrReply(CompanyUpdateSchema, request.body, reply);
     if (!data) return;
@@ -188,7 +217,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
     const { website, instagram, facebook, phone } = data;
 
     const company = await prisma.company.findUnique({
-      where: { id: parseInt(companyId) },
+      where: { id: parsedCompanyId },
     });
 
     if (!company) {
@@ -202,7 +231,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
     if (phone !== undefined) updateData.phone = phone || null;
 
     const updated = await prisma.company.update({
-      where: { id: parseInt(companyId) },
+      where: { id: parsedCompanyId },
       data: updateData,
     });
 

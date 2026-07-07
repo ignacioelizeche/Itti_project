@@ -226,6 +226,7 @@ const scrapeWorker = new Worker(
   {
     connection: connectionConfig,
     concurrency: config.workers.concurrency,
+    lockDuration: 300000,
   }
 );
 

@@ -18,6 +18,27 @@ interface RawCompanyData {
   source: string;
 }
 
+const SOCIAL_URL_PATTERNS = [
+  { pattern: /instagram\.com/i, field: "instagram" as const },
+  { pattern: /facebook\.com|fb\.com|fb\.me/i, field: "facebook" as const },
+  { pattern: /twitter\.com|x\.com/i, field: "twitter" as const },
+  { pattern: /linkedin\.com/i, field: "linkedin" as const },
+  { pattern: /tiktok\.com/i, field: "tiktok" as const },
+  { pattern: /youtube\.com|youtu\.be/i, field: "youtube" as const },
+];
+
+function classifyUrl(url: string): { isSocial: boolean; field?: string; username?: string } {
+  for (const { pattern, field } of SOCIAL_URL_PATTERNS) {
+    if (pattern.test(url)) {
+      // Extract username from URL
+      const match = url.match(/instagram\.com\/([^/?#]+)/);
+      const username = match ? `@${match[1]}` : undefined;
+      return { isSocial: true, field, username };
+    }
+  }
+  return { isSocial: false };
+}
+
 function normalizeCategory(rawCategory?: string): string {
   if (!rawCategory) return "Otros";
 
@@ -65,8 +86,10 @@ function extractBaseName(branchName: string): string | null {
   return null;
 }
 
+type PrismaTx = Pick<PrismaClient, "company">;
+
 async function findPotentialParent(
-  prisma: PrismaClient,
+  prisma: PrismaTx,
   baseName: string,
   category: string | null,
   city: string
@@ -103,6 +126,23 @@ export async function normalizeAndUpsert(
   const city = "Asunción";
   const slug = generateSlug(name, city);
 
+  // Fix social media URLs misclassified as website
+  let { website, instagram, facebook } = data;
+  if (website) {
+    const classified = classifyUrl(website);
+    if (classified.isSocial) {
+      if (classified.field === "instagram" && !instagram) {
+        instagram = classified.username || website;
+        logger.info(`[Normalizer] Moved Instagram URL from website to instagram field for "${name}"`);
+        website = undefined;
+      } else if (classified.field === "facebook" && !facebook) {
+        facebook = website;
+        logger.info(`[Normalizer] Moved Facebook URL from website to facebook field for "${name}"`);
+        website = undefined;
+      }
+    }
+  }
+
   // Check if company already exists by slug or name+city
   const existing = await prisma.company.findFirst({
     where: {
@@ -121,15 +161,15 @@ export async function normalizeAndUpsert(
         ...(data.latitude && !existing.latitude ? { latitude: data.latitude } : {}),
         ...(data.longitude && !existing.longitude ? { longitude: data.longitude } : {}),
         ...(data.phone && !existing.phone ? { phone: data.phone } : {}),
-        ...(data.website && !existing.website ? { website: data.website } : {}),
+        ...(website && !existing.website ? { website } : {}),
         ...(data.googleRating && !existing.googleRating
           ? { googleRating: data.googleRating }
           : {}),
         ...(data.googleReviews && !existing.googleReviews
           ? { googleReviews: data.googleReviews }
           : {}),
-        ...(data.instagram && !existing.instagram ? { instagram: data.instagram } : {}),
-        ...(data.facebook && !existing.facebook ? { facebook: data.facebook } : {}),
+        ...(instagram && !existing.instagram ? { instagram } : {}),
+        ...(facebook && !existing.facebook ? { facebook } : {}),
         ...(data.description && !existing.description
           ? { description: data.description }
           : {}),
@@ -146,41 +186,45 @@ export async function normalizeAndUpsert(
     return { id: updated.id, isNew: false };
   }
 
-  // Create new company
-  const created = await prisma.company.create({
-    data: {
-      name,
-      slug,
-      category: normalizedCategory,
-      address: data.address,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      city,
-      country: "Paraguay",
-      phone: data.phone,
-      website: data.website,
-      googleRating: data.googleRating,
-      googleReviews: data.googleReviews,
-      instagram: data.instagram,
-      facebook: data.facebook,
-      description: data.description,
-      lastScrapedAt: new Date(),
-      dataSources: { [data.source]: new Date().toISOString() },
-    },
-  });
+  // Create new company and optionally link to parent in a transaction
+  const created = await prisma.$transaction(async (tx) => {
+    const newCompany = await tx.company.create({
+      data: {
+        name,
+        slug,
+        category: normalizedCategory,
+        address: data.address,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        city,
+        country: "Paraguay",
+        phone: data.phone,
+        website,
+        googleRating: data.googleRating,
+        googleReviews: data.googleReviews,
+        instagram,
+        facebook,
+        description: data.description,
+        lastScrapedAt: new Date(),
+        dataSources: { [data.source]: new Date().toISOString() },
+      },
+    });
 
-  // Auto-detect chain: if name looks like a branch, link to parent
-  const baseName = extractBaseName(name);
-  if (baseName) {
-    const parent = await findPotentialParent(prisma, baseName, data.category, city);
-    if (parent) {
-      await prisma.company.update({
-        where: { id: created.id },
-        data: { parentId: parent.id },
-      });
-      logger.info(`[Normalizer] Linked "${name}" as branch of "${baseName}" (id=${parent.id})`);
+    // Auto-detect chain: if name looks like a branch, link to parent
+    const baseName = extractBaseName(name);
+    if (baseName) {
+      const parent = await findPotentialParent(tx, baseName, data.category ?? null, city);
+      if (parent) {
+        await tx.company.update({
+          where: { id: newCompany.id },
+          data: { parentId: parent.id },
+        });
+        logger.info(`[Normalizer] Linked "${name}" as branch of "${baseName}" (id=${parent.id})`);
+      }
     }
-  }
+
+    return newCompany;
+  });
 
   return { id: created.id, isNew: true };
 }

@@ -25,7 +25,7 @@ Reglas:
 const MAX_QUERY_LENGTH = 200;
 
 export async function discoverRoutes(fastify: FastifyInstance) {
-  // POST /api/discover - Intelligent search from natural language
+  // POST /api/discover - Intelligent search from natural language (SSE streaming)
   fastify.post("/", {
     schema: {
       tags: ["Discover"],
@@ -42,114 +42,247 @@ export async function discoverRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: `Query too long (max ${MAX_QUERY_LENGTH} characters)` });
     }
 
-    try {
-      // 1. Generate search queries with AI (structured system/user messages)
-      const aiResponse = await chatCompletion([
-        { role: "system", content: QUERY_GENERATION_SYSTEM },
-        { role: "user", content: `Generá 3 consultas de búsqueda para: ${query}` }
-      ], { temperature: 0.3 });
-      
-      // Extract JSON array from response
-      const jsonMatch = aiResponse.match(/\[[\s\S]*?\]/);
-      if (!jsonMatch) {
-        return reply.status(500).send({ error: "Could not generate search queries" });
-      }
+    // Check if client wants SSE stream
+    const accept = request.headers.accept || "";
+    const wantsStream = accept.includes("text/event-stream");
 
-      const searchQueries: string[] = JSON.parse(jsonMatch[0]);
-      logger.info(`[Discover] Generated ${searchQueries.length} queries from: "${query}"`);
+    if (wantsStream) {
+      // SSE streaming response
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
 
-      // 2. Search Google Places for each query
-      const allResults = [];
-      const seenNames = new Set<string>();
-
-      for (const searchQuery of searchQueries) {
-        try {
-          const results = await searchPlaces({
-            query: searchQuery,
-            locationBias: {
-              latitude: ASUNCION_COORDS.latitude,
-              longitude: ASUNCION_COORDS.longitude,
-              radius: config.scraper.googlePlacesRadius,
-            },
-            maxResults: config.scraper.googlePlacesMaxResults,
-            languageCode: "es",
-          });
-
-          for (const place of results) {
-            const normalizedName = place.name.toLowerCase().trim();
-            if (!seenNames.has(normalizedName)) {
-              seenNames.add(normalizedName);
-              allResults.push({
-                name: place.name,
-                address: place.address,
-                latitude: place.latitude,
-                longitude: place.longitude,
-                category: place.category,
-                phone: place.phoneNumber,
-                website: place.website,
-                googleRating: place.googleRating,
-                googleReviews: place.googleReviews,
-                source: "discover",
-              });
-            }
-          }
-        } catch (err) {
-          logger.error(err, `[Discover] Error searching "${searchQuery}"`);
-        }
-      }
-
-      logger.info(`[Discover] Found ${allResults.length} unique results`);
-
-      // 3. Save to database, enrich, and queue for analysis
-      const saved = [];
-      for (const place of allResults) {
-        try {
-          const result = await normalizeAndUpsert(prisma, place);
-          const company = await prisma.company.findUnique({
-            where: { id: result.id },
-            include: { score: true },
-          });
-          if (company) {
-            saved.push({ ...company, isNew: result.isNew });
-            
-            // Auto-enrich and analyze new companies
-            if (autoEnrich && result.isNew) {
-              enrichCompany(result.id).catch((err) => {
-                logger.error(err, `[Discover] Auto-enrich failed for ${place.name}`);
-              });
-              // Queue for analysis
-              analyzeQueue.add(`analyze-${result.id}`, { companyId: result.id }, {
-                attempts: config.workers.discoverAttempts,
-                backoff: { type: "exponential", delay: config.workers.discoverBackoffDelay },
-              }).catch((err) => {
-                logger.error(err, `[Discover] Failed to queue analysis for ${place.name}`);
-              });
-            }
-          }
-        } catch (err) {
-          logger.error(err, `[Discover] Error saving "${place.name}"`);
-        }
-      }
-
-      return {
-        query,
-        generatedQueries: searchQueries,
-        totalFound: allResults.length,
-        saved: saved.length,
-        newCompanies: saved.filter((c) => c.isNew).length,
-        companies: saved.map((c) => ({
-          id: c.id,
-          name: c.name,
-          category: c.category,
-          address: c.address,
-          googleRating: c.googleRating,
-          score: c.score?.totalScore,
-          isNew: c.isNew,
-        })),
+      const send = (event: string, data: unknown) => {
+        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
-    } catch (error) {
-      logger.error(error, "[Discover] Error");
-      return reply.status(500).send({ error: "Discovery failed" });
+
+      try {
+        // 1. Generate search queries with AI
+        send("progress", { step: "queries", message: "Generando consultas con IA..." });
+
+        const aiResponse = await chatCompletion([
+          { role: "system", content: QUERY_GENERATION_SYSTEM },
+          { role: "user", content: `Generá 3 consultas de búsqueda para: ${query}` }
+        ], { temperature: 0.3 });
+
+        const jsonMatch = aiResponse.match(/\[[\s\S]*?\]/);
+        if (!jsonMatch) {
+          send("error", { error: "Could not generate search queries" });
+          reply.raw.end();
+          return;
+        }
+
+        const searchQueries: string[] = JSON.parse(jsonMatch[0]);
+        logger.info(`[Discover] Generated ${searchQueries.length} queries from: "${query}"`);
+        send("queries", { queries: searchQueries });
+
+        // 2. Search Google Places for each query
+        const allResults = [];
+        const seenNames = new Set<string>();
+
+        for (let i = 0; i < searchQueries.length; i++) {
+          const searchQuery = searchQueries[i];
+          send("progress", { step: "search", message: `Buscando: "${searchQuery}" (${i + 1}/${searchQueries.length})...` });
+
+          try {
+            const results = await searchPlaces({
+              query: searchQuery,
+              locationBias: {
+                latitude: ASUNCION_COORDS.latitude,
+                longitude: ASUNCION_COORDS.longitude,
+                radius: config.scraper.googlePlacesRadius,
+              },
+              maxResults: config.scraper.googlePlacesMaxResults,
+              languageCode: "es",
+            });
+
+            for (const place of results) {
+              const normalizedName = place.name.toLowerCase().trim();
+              if (!seenNames.has(normalizedName)) {
+                seenNames.add(normalizedName);
+                allResults.push({
+                  name: place.name,
+                  address: place.address,
+                  latitude: place.latitude,
+                  longitude: place.longitude,
+                  category: place.category,
+                  phone: place.phoneNumber,
+                  website: place.website,
+                  googleRating: place.googleRating,
+                  googleReviews: place.googleReviews,
+                  source: "discover",
+                });
+              }
+            }
+          } catch (err) {
+            logger.error(err, `[Discover] Error searching "${searchQuery}"`);
+          }
+        }
+
+        logger.info(`[Discover] Found ${allResults.length} unique results`);
+        send("progress", { step: "save", message: `Guardando ${allResults.length} empresas encontradas...` });
+
+        // 3. Save to database, enrich, and queue for analysis
+        const saved = [];
+        for (const place of allResults) {
+          try {
+            const result = await normalizeAndUpsert(prisma, place);
+            const company = await prisma.company.findUnique({
+              where: { id: result.id },
+              include: { score: true },
+            });
+            if (company) {
+              saved.push({ ...company, isNew: result.isNew });
+
+              if (autoEnrich && result.isNew) {
+                enrichCompany(result.id).catch((err) => {
+                  logger.error(err, `[Discover] Auto-enrich failed for ${place.name}`);
+                });
+                analyzeQueue.add(`analyze-${result.id}`, { companyId: result.id }, {
+                  attempts: config.workers.discoverAttempts,
+                  backoff: { type: "exponential", delay: config.workers.discoverBackoffDelay },
+                }).catch((err) => {
+                  logger.error(err, `[Discover] Failed to queue analysis for ${place.name}`);
+                });
+              }
+            }
+          } catch (err) {
+            logger.error(err, `[Discover] Error saving "${place.name}"`);
+          }
+        }
+
+        // Send final result
+        send("result", {
+          query,
+          generatedQueries: searchQueries,
+          totalFound: allResults.length,
+          saved: saved.length,
+          newCompanies: saved.filter((c) => c.isNew).length,
+          companies: saved.map((c) => ({
+            id: c.id,
+            name: c.name,
+            category: c.category,
+            address: c.address,
+            googleRating: c.googleRating,
+            score: c.score?.totalScore,
+            isNew: c.isNew,
+          })),
+        });
+
+        reply.raw.end();
+      } catch (error) {
+        logger.error(error, "[Discover] Error");
+        send("error", { error: "Discovery failed" });
+        reply.raw.end();
+      }
+    } else {
+      // Non-streaming fallback (original behavior)
+      try {
+        const aiResponse = await chatCompletion([
+          { role: "system", content: QUERY_GENERATION_SYSTEM },
+          { role: "user", content: `Generá 3 consultas de búsqueda para: ${query}` }
+        ], { temperature: 0.3 });
+
+        const jsonMatch = aiResponse.match(/\[[\s\S]*?\]/);
+        if (!jsonMatch) {
+          return reply.status(500).send({ error: "Could not generate search queries" });
+        }
+
+        const searchQueries: string[] = JSON.parse(jsonMatch[0]);
+        logger.info(`[Discover] Generated ${searchQueries.length} queries from: "${query}"`);
+
+        const allResults = [];
+        const seenNames = new Set<string>();
+
+        for (const searchQuery of searchQueries) {
+          try {
+            const results = await searchPlaces({
+              query: searchQuery,
+              locationBias: {
+                latitude: ASUNCION_COORDS.latitude,
+                longitude: ASUNCION_COORDS.longitude,
+                radius: config.scraper.googlePlacesRadius,
+              },
+              maxResults: config.scraper.googlePlacesMaxResults,
+              languageCode: "es",
+            });
+
+            for (const place of results) {
+              const normalizedName = place.name.toLowerCase().trim();
+              if (!seenNames.has(normalizedName)) {
+                seenNames.add(normalizedName);
+                allResults.push({
+                  name: place.name,
+                  address: place.address,
+                  latitude: place.latitude,
+                  longitude: place.longitude,
+                  category: place.category,
+                  phone: place.phoneNumber,
+                  website: place.website,
+                  googleRating: place.googleRating,
+                  googleReviews: place.googleReviews,
+                  source: "discover",
+                });
+              }
+            }
+          } catch (err) {
+            logger.error(err, `[Discover] Error searching "${searchQuery}"`);
+          }
+        }
+
+        logger.info(`[Discover] Found ${allResults.length} unique results`);
+
+        const saved = [];
+        for (const place of allResults) {
+          try {
+            const result = await normalizeAndUpsert(prisma, place);
+            const company = await prisma.company.findUnique({
+              where: { id: result.id },
+              include: { score: true },
+            });
+            if (company) {
+              saved.push({ ...company, isNew: result.isNew });
+
+              if (autoEnrich && result.isNew) {
+                enrichCompany(result.id).catch((err) => {
+                  logger.error(err, `[Discover] Auto-enrich failed for ${place.name}`);
+                });
+                analyzeQueue.add(`analyze-${result.id}`, { companyId: result.id }, {
+                  attempts: config.workers.discoverAttempts,
+                  backoff: { type: "exponential", delay: config.workers.discoverBackoffDelay },
+                }).catch((err) => {
+                  logger.error(err, `[Discover] Failed to queue analysis for ${place.name}`);
+                });
+              }
+            }
+          } catch (err) {
+            logger.error(err, `[Discover] Error saving "${place.name}"`);
+          }
+        }
+
+        return {
+          query,
+          generatedQueries: searchQueries,
+          totalFound: allResults.length,
+          saved: saved.length,
+          newCompanies: saved.filter((c) => c.isNew).length,
+          companies: saved.map((c) => ({
+            id: c.id,
+            name: c.name,
+            category: c.category,
+            address: c.address,
+            googleRating: c.googleRating,
+            score: c.score?.totalScore,
+            isNew: c.isNew,
+          })),
+        };
+      } catch (error) {
+        logger.error(error, "[Discover] Error");
+        return reply.status(500).send({ error: "Discovery failed" });
+      }
     }
   });
 }

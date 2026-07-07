@@ -9,6 +9,10 @@ export async function decisionRoutes(fastify: FastifyInstance) {
     Params: { companyId: string };
   }>("/decide/:companyId", async (request, reply) => {
     const { companyId } = request.params;
+    const parsedCompanyId = parseInt(companyId);
+    if (isNaN(parsedCompanyId)) {
+      return reply.status(400).send({ error: "Invalid companyId" });
+    }
 
     const data = validateOrReply(DecideSchema, request.body, reply);
     if (!data) return;
@@ -16,7 +20,7 @@ export async function decisionRoutes(fastify: FastifyInstance) {
     const { decision, note } = data;
 
     const company = await prisma.company.findUnique({
-      where: { id: parseInt(companyId) },
+      where: { id: parsedCompanyId },
     });
 
     if (!company) {
@@ -24,7 +28,7 @@ export async function decisionRoutes(fastify: FastifyInstance) {
     }
 
     const updated = await prisma.company.update({
-      where: { id: parseInt(companyId) },
+      where: { id: parsedCompanyId },
       data: {
         humanDecision: decision,
         humanNote: note || null,
@@ -46,9 +50,14 @@ export async function decisionRoutes(fastify: FastifyInstance) {
   // GET /api/scores/decisions - Get companies with decisions
   fastify.get<{
     Querystring: { filter?: string; limit?: string };
-  }>("/decisions", async (request) => {
+  }>("/decisions", async (request, reply) => {
     const parseResult = DecisionFilterSchema.safeParse(request.query);
-    const { filter, limit } = parseResult.success ? parseResult.data : { filter: "all", limit: "100" };
+    const { filter, limit: rawLimit = "100" } = parseResult.success ? parseResult.data : { filter: "all", limit: "100" };
+
+    const parsedLimit = parseInt(rawLimit);
+    if (isNaN(parsedLimit) || parsedLimit < 1) {
+      return reply.status(400).send({ error: "Invalid limit parameter" });
+    }
 
     const where: any = {};
     if (filter === "pending") {
@@ -64,7 +73,7 @@ export async function decisionRoutes(fastify: FastifyInstance) {
         score: { select: { totalScore: true, scoreLabel: true } },
       },
       orderBy: { id: "desc" },
-      take: parseInt(limit),
+      take: parsedLimit,
     });
 
     const approved = await prisma.company.count({ where: { humanDecision: "approved" } });
